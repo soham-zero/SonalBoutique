@@ -102,7 +102,7 @@ export default function AddExpensePage() {
              min={0}
              step="0.01"
              value={amount}
-             onChange={(e) => setAmount(e.target.value)}
+             onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
              required
            />
 

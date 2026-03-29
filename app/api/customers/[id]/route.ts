@@ -6,8 +6,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('customers')
+  const { data, error } = await (supabase
+    .from('customers') as any)
     .select(`
       *,
       customer_balance_ledger (

@@ -11,8 +11,8 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let dbQuery = supabase
-    .from('transactions')
+  let dbQuery = (supabase
+    .from('transactions') as any)
     .select('*')
     .order('date_time', { ascending: false })
     .range(offset, offset + limit - 1)

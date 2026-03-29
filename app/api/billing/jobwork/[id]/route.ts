@@ -7,8 +7,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('job_items')
+  const { data, error } = await (supabase
+    .from('job_items') as any)
     .select(`
       *,
       transactions ( transaction_number ),

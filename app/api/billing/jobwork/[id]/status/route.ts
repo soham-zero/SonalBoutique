@@ -21,8 +21,8 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // 1. Fetch current status
-    const { data: currentJob, error: jobErr } = await supabase
-      .from('job_items')
+    const { data: currentJob, error: jobErr } = await (supabase
+      .from('job_items') as any)
       .select('status')
       .eq('id', jobId)
       .single()
@@ -48,7 +48,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     }
 
     // 2. Insert Ledger (acts as atomic hook, though no RPC, we sequentially execute)
-    const { error: lgErr } = await supabase.from('job_item_ledger').insert({
+    const { error: lgErr } = await (supabase.from('job_item_ledger') as any).insert({
       job_item_id: jobId,
       employee_id: employee_id || null,
       employee_name: employee_name,
@@ -58,7 +58,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (lgErr) throw new Error("Failed to record ledger: " + lgErr.message)
 
     // 3. Update Status
-    const { error: updErr } = await supabase.from('job_items').update({
+    const { error: updErr } = await (supabase.from('job_items') as any).update({
       status: next_status
     }).eq('id', jobId)
 

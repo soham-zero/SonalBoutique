@@ -205,7 +205,7 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
             </div>
           ) : (
              <div className="p-4 bg-green-50 rounded border border-green-200 text-green-700 font-medium">
-               This job has reached the "Complete" stage. No further progression allowed.
+               This job has reached the &quot;Complete&quot; stage. No further progression allowed.
              </div>
           )}
         </div>

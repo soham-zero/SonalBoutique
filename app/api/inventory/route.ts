@@ -9,8 +9,8 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let dbQuery = supabase
-    .from('inventory')
+  let dbQuery = (supabase
+    .from('inventory') as any)
     .select('*')
     .order('name', { ascending: true })
 
@@ -32,8 +32,8 @@ export async function POST(request: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     // Only for admin creation
-    const { data, error } = await supabase
-      .from('inventory')
+    const { data, error } = await (supabase
+      .from('inventory') as any)
       .insert({
         custom_code: body.custom_code,
         name: body.name,
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     // Initial ledger entry
     if (body.current_quantity > 0) {
-      await supabase.from('inventory_ledger').insert({
+      await (supabase.from('inventory_ledger') as any).insert({
         inventory_id: data.id,
         quantity_added: body.current_quantity,
         cost_price: 0, // initial stock

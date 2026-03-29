@@ -6,8 +6,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
-    .from('inventory')
+  const { data, error } = await (supabase
+    .from('inventory') as any)
     .select(`
       *,
       inventory_ledger (
@@ -33,7 +33,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { error } = await supabase.from('inventory').update({ selling_price }).eq('id', Number(params.id))
+    const { error } = await (supabase.from('inventory') as any).update({ selling_price }).eq('id', Number(params.id))
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true })

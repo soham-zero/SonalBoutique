@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data, error } = await supabase.from('employees').insert({ name }).select().single()
+    const { data, error } = await (supabase.from('employees') as any).insert({ name }).select().single()
     if (error) throw new Error(error.message)
 
     return NextResponse.json({ success: true, employee: data })

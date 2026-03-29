@@ -12,11 +12,11 @@ export async function POST(request: Request, { params }: { params: { id: string,
     const admin = createAdminClient()
 
     // 1. Fetch member
-    const { data: member, error: mbErr } = await admin.from('bishi_members').select('*').eq('id', memberId).single()
+    const { data: member, error: mbErr } = await (admin.from('bishi_members') as any).select('*').eq('id', memberId).single()
     if (mbErr) throw new Error("Member not found")
 
     // 2. Insert ledger
-    await admin.from('bishi_ledger').insert({
+    await (admin.from('bishi_ledger') as any).insert({
       bishi_id: bishi_id,
       bishi_member_id: memberId,
       contribution_amount: Number(amount),
@@ -27,7 +27,7 @@ export async function POST(request: Request, { params }: { params: { id: string,
     const newTotalContributed = Number(member.total_contributed) + Number(amount)
     const newBalance = Number(member.balance) + Number(amount)
 
-    await admin.from('bishi_members').update({
+    await (admin.from('bishi_members') as any).update({
        total_contributed: newTotalContributed,
        balance: newBalance,
        last_updated: new Date().toISOString()

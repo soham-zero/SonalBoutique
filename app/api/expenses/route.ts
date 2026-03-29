@@ -11,7 +11,7 @@ export async function GET(request: Request) {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let dbQuery = supabase.from('expenses').select('*').order('date_time', { ascending: false })
+  let dbQuery = (supabase.from('expenses') as any).select('*').order('date_time', { ascending: false })
 
   if (expenseType) dbQuery = dbQuery.eq('expense_type', expenseType)
   if (category) dbQuery = dbQuery.eq('category', category)
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data, error } = await supabase.from('expenses').insert({
+    const { data, error } = await (supabase.from('expenses') as any).insert({
       expense_type: body.expense_type,
       category: body.category,
       description: body.description || null,

@@ -7,7 +7,7 @@ export async function GET() {
 
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase.from('bishi').select('*').order('name')
+  const { data, error } = await (supabase.from('bishi') as any).select('*').order('name')
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { data, error } = await supabase.from('bishi').insert({
+    const { data, error } = await (supabase.from('bishi') as any).insert({
       name: body.name,
       contribution_amount: body.contribution_amount,
       total_members: body.total_members,

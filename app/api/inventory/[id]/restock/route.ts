@@ -9,18 +9,18 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const admin = createAdminClient()
 
     // 1. Get current
-    const { data: inv, error: err1 } = await admin.from('inventory').select('current_quantity').eq('id', id).single()
+    const { data: inv, error: err1 } = await (admin.from('inventory') as any).select('current_quantity').eq('id', id).single()
     if (err1) throw new Error("Item not found")
 
     // 2. Insert ledger
-    await admin.from('inventory_ledger').insert({
+    await (admin.from('inventory_ledger') as any).insert({
       inventory_id: id,
       quantity_added,
       cost_price
     })
 
     // 3. Update quantity
-    await admin.from('inventory').update({
+    await (admin.from('inventory') as any).update({
        current_quantity: Number(inv.current_quantity) + Number(quantity_added)
     }).eq('id', id)
 

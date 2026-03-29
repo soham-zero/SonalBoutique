@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, Trash2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
+import { Plus, ArrowUpCircle, ArrowDownCircle } from 'lucide-react'
 
 export function InventoryTab() {
   const [items, setItems] = useState<any[]>([])
