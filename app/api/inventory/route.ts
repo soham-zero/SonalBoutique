@@ -31,7 +31,6 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Only for admin creation
     const { data, error } = await (supabase
       .from('inventory') as any)
       .insert({
@@ -45,12 +44,12 @@ export async function POST(request: Request) {
 
     if (error) throw new Error(error.message)
 
-    // Initial ledger entry
+    // Initial ledger entry — use actual cost_price if provided
     if (body.current_quantity > 0) {
       await (supabase.from('inventory_ledger') as any).insert({
         inventory_id: data.id,
         quantity_added: body.current_quantity,
-        cost_price: 0, // initial stock
+        cost_price: Number(body.cost_price) || 0,
       })
     }
 

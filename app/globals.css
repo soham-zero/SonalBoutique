@@ -1,18 +1,18 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --background: #FAF9F6; /* boutique.cream */
-  --foreground: #302f2f; /* boutique.charcoal */
+  --background: #FAF9F6;
+  --foreground: #333333;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #f8e4e4;
-    --foreground: #302f2f;
+    --background: #FAF9F6;
+    --foreground: #333333;
   }
 }
 
@@ -20,27 +20,73 @@ body {
   color: var(--foreground);
   background: var(--background);
   font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, h5, h6 {
   font-family: 'Playfair Display', serif;
 }
 
-/* Custom scrollbar for modern feel */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+/* ─── Scrollbar ───────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #E2DCD0; border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: #C4827F; }
+
+/* ─── Card hover lift ─────────────────────────────────── */
+@layer utilities {
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px -4px rgba(0,0,0,0.12), 0 2px 8px -2px rgba(0,0,0,0.06);
+  }
+
+  /* Modal backdrop */
+  .modal-backdrop {
+    @apply fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4;
+    animation: fade-backdrop 0.15s ease-out;
+  }
+
+  /* Status badge helpers */
+  .badge {
+    @apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold tracking-wide;
+  }
+  .badge-emerald { @apply badge bg-boutique-emeraldLight text-emerald-800; }
+  .badge-amber   { @apply badge bg-boutique-amberLight text-amber-800; }
+  .badge-rose    { @apply badge bg-boutique-roseLight text-rose-800; }
+  .badge-ruby    { @apply badge bg-boutique-rubyLight text-red-800; }
+  .badge-indigo  { @apply badge bg-boutique-indigoLight text-indigo-800; }
+  .badge-teal    { @apply badge bg-boutique-tealLight text-teal-800; }
+  .badge-gray    { @apply badge bg-gray-100 text-gray-600; }
+
+  /* Section title accent */
+  .section-title {
+    @apply font-serif font-bold text-lg text-boutique-charcoal relative inline-block;
+  }
+  .section-title::after {
+    content: '';
+    @apply absolute left-0 -bottom-1 h-0.5 w-8 bg-boutique-roseDark rounded-full;
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    @apply hover:bg-boutique-cream/70 transition-colors duration-100;
+  }
+
+  /* Ledger group header */
+  .group-header-row td {
+    @apply bg-boutique-creamDark/80 px-6 py-2 text-xs font-bold uppercase tracking-widest text-boutique-charcoalLight border-y border-boutique-border;
+  }
 }
 
-::-webkit-scrollbar-track {
-  background: transparent;
+@keyframes fade-backdrop {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-::-webkit-scrollbar-thumb {
-  background: #E2DCD0;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #DDA7A5;
-}
+/* ─── Animate-in utility ─────────────────────────────── */
+.animate-in { animation-fill-mode: both; }
+.fade-in { animation-name: fade-in; animation-duration: 0.22s; animation-timing-function: ease-out; }
+.slide-in-from-top-4 { --tw-translate-y: -1rem; }
