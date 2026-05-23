@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { ChevronDown, ChevronUp, Search, Plus, Trash2 } from 'lucide-react'
+import { CalendarClock, ChevronDown, ChevronUp, Search, Plus, Trash2 } from 'lucide-react'
 
 // Types
 type InventoryItem = { id: number; name: string; custom_code: string; selling_price: number; current_quantity: number }
@@ -13,6 +13,12 @@ type BillItem = { tempId: number; inventory_id: number; name: string; quantity: 
 type JobItem = { tempId: number; charge: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string }
 type BishiGroup = { id: number; name: string }
 type BishiMember = { id: number; name: string }
+
+const getLocalDateTimeValue = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 16)
+}
 
 export default function NewBillPage() {
   const router = useRouter()
@@ -36,6 +42,8 @@ export default function NewBillPage() {
   const [amountPaid, setAmountPaid] = useState<number | ''>('')
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [isOldBill, setIsOldBill] = useState(false)
+  const [billDateTime, setBillDateTime] = useState('')
   
   // Bishi Toggle
   const [isBishiSale, setIsBishiSale] = useState(false)
@@ -51,8 +59,8 @@ export default function NewBillPage() {
     async function loadInitial() {
       try {
         const [invRes, bishiRes] = await Promise.all([
-          fetch('/api/inventory'),
-          fetch('/api/bishi')
+          fetch('/api/inventory?limit=1000'),
+          fetch('/api/bishi?limit=1000')
         ])
         
         if (invRes.ok) {
@@ -68,6 +76,10 @@ export default function NewBillPage() {
       }
     }
     loadInitial()
+  }, [])
+
+  useEffect(() => {
+    setBillDateTime(getLocalDateTimeValue())
   }, [])
 
   // Fetch Bishi Members when Group selected
@@ -183,6 +195,27 @@ export default function NewBillPage() {
       return
     }
 
+    let selectedBillDateTime: string | null = null
+    if (isOldBill) {
+      if (!billDateTime) {
+        setError("Please select the original bill date and time.")
+        return
+      }
+
+      const parsedBillDateTime = new Date(billDateTime)
+      if (Number.isNaN(parsedBillDateTime.getTime())) {
+        setError("Please enter a valid original bill date and time.")
+        return
+      }
+
+      if (parsedBillDateTime.getTime() > Date.now()) {
+        setError("Old bill date and time cannot be in the future.")
+        return
+      }
+
+      selectedBillDateTime = parsedBillDateTime.toISOString()
+    }
+
     setLoading(true)
 
     const payload = {
@@ -201,7 +234,8 @@ export default function NewBillPage() {
       customer_name: customerName,
       customer_phone: customerPhone,
       bishi_id: isBishiSale ? selectedBishiGroupId : null,
-      bishi_member_id: isBishiSale ? selectedBishiMemberId : null
+      bishi_member_id: isBishiSale ? selectedBishiMemberId : null,
+      bill_date_time: selectedBillDateTime
     }
 
     try {
@@ -310,7 +344,7 @@ export default function NewBillPage() {
                   <div key={item.tempId} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-center p-3 bg-gray-50 rounded-md border border-boutique-border">
                     <div className="col-span-4 w-full">
                       <p className="font-medium text-boutique-charcoal">{item.name}</p>
-                      <p className="text-xs text-gray-700 hidden md:block">Price: ₹{item.selling_price} (Calculated backend)</p>
+                      <p className="text-xs text-gray-700 hidden md:block">Price: ₹{item.selling_price}</p>
                     </div>
                     <div className="col-span-2 w-full">
                       <Input 
@@ -442,6 +476,41 @@ export default function NewBillPage() {
                 required={dueAmount > 0}
               />
             </div>
+
+            <div className="p-4 bg-white rounded-md border border-boutique-border mt-2 space-y-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 text-sm font-medium text-boutique-charcoal">
+                  <CalendarClock className="w-4 h-4 text-boutique-charcoalLight" />
+                  <span>Bill is from a past date</span>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOldBill}
+                  onClick={() => setIsOldBill(prev => !prev)}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-boutique-roseLight focus-visible:ring-offset-2 ${
+                    isOldBill ? 'bg-boutique-charcoal' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                      isOldBill ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {isOldBill && (
+                <Input
+                  label="Original Bill Date & Time"
+                  type="datetime-local"
+                  value={billDateTime}
+                  max={getLocalDateTimeValue()}
+                  onChange={(e) => setBillDateTime(e.target.value)}
+                  required
+                />
+              )}
+            </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -460,7 +529,7 @@ export default function NewBillPage() {
               </div>
               
               <Input 
-                label="Amount Paid Today" 
+                label={isOldBill ? "Amount Paid on Bill Date" : "Amount Paid Today"} 
                 type="number" 
                 min={0}
                 value={amountPaid}

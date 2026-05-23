@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { PageHeader } from '@/components/ui/PageHeader'
+import { Button } from '@/components/ui/Button'
 import { format } from 'date-fns'
+import { ArrowLeft, BadgeCheck, CreditCard, ReceiptText, Tag } from 'lucide-react'
 
 export default function BillDetail({ params }: { params: { id: string } }) {
   const [data, setData] = useState<any>(null)
@@ -25,12 +28,23 @@ export default function BillDetail({ params }: { params: { id: string } }) {
   if (!data) return <div className="p-8 text-center text-red-500">Bill not found.</div>
 
   const bishiSale = data.bishi_sales?.[0]
+  const grossTotal = data.total_amount + data.discount_amount
+  const outstandingDue = Math.max(0, data.total_amount - data.amount_paid)
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20">
-      <PageHeader 
-        title={`Bill #${data.transaction_number}`} 
-        description={`Logged on ${format(new Date(data.date_time), 'PPp')}`} 
+      <div className="flex items-center gap-3">
+        <Link href="/dashboard/billing">
+          <Button variant="ghost" size="sm" className="gap-1.5">
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        </Link>
+      </div>
+
+      <PageHeader
+        title={`Bill #${data.transaction_number}`}
+        description={`Logged on ${format(new Date(data.date_time), 'PPp')}`}
       />
 
       {/* HEADER CARD */}
@@ -39,14 +53,14 @@ export default function BillDetail({ params }: { params: { id: string } }) {
           <h2 className="text-sm font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-2">Customer Info</h2>
           <p className="font-medium text-lg text-boutique-charcoal">{data.customer_name || 'Walk-in'}</p>
           {data.customer_phone && <p className="text-sm text-gray-700">{data.customer_phone}</p>}
-          
+
           {bishiSale && (
             <div className="mt-3 inline-block bg-boutique-roseLight text-boutique-charcoal text-xs font-semibold px-2 py-1 rounded-md">
               Bishi Sale: {bishiSale.bishi?.name} ({bishiSale.bishi_members?.name})
             </div>
           )}
         </div>
-        
+
         <div className="md:text-right">
           <h2 className="text-sm font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-2">Payment Mode</h2>
           <p className="font-medium text-lg text-boutique-charcoal capitalize">{data.payment_mode}</p>
@@ -120,29 +134,72 @@ export default function BillDetail({ params }: { params: { id: string } }) {
       )}
 
       {/* TOTAL SUMMARY */}
-      <div className="bg-boutique-charcoal text-white rounded-xl shadow-soft p-6 flex flex-col items-end space-y-3">
-        <div className="w-full md:w-1/2 flex justify-between">
-          <span className="text-gray-300">Gross Total:</span>
-          <span>₹{(data.total_amount + data.discount_amount).toFixed(2)}</span>
-        </div>
-        <div className="w-full md:w-1/2 flex justify-between text-boutique-roseLight">
-          <span>Net Discount:</span>
-          <span>-₹{data.discount_amount.toFixed(2)}</span>
-        </div>
-        <div className="w-full md:w-1/2 flex justify-between text-lg font-serif font-bold pt-2 border-t border-gray-600">
-          <span>Net Total:</span>
-          <span>₹{data.total_amount.toFixed(2)}</span>
-        </div>
-        <div className="w-full md:w-1/2 flex justify-between font-medium text-green-400">
-          <span>Amount Paid:</span>
-          <span>₹{data.amount_paid.toFixed(2)}</span>
-        </div>
-        {data.total_amount > data.amount_paid && (
-          <div className="w-full md:w-1/2 flex justify-between font-bold text-red-400">
-            <span>Outstanding Due:</span>
-            <span>₹{(data.total_amount - data.amount_paid).toFixed(2)}</span>
+      <div className="overflow-hidden rounded-xl border border-boutique-border bg-white shadow-card">
+        <div className="bg-boutique-charcoal px-6 py-5 text-white">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-boutique-roseLight">Total Summary</p>
+              <h3 className="mt-1 text-2xl font-serif font-bold">Final Bill Amount</h3>
+            </div>
+            <div className="rounded-lg bg-white px-5 py-3 text-right text-boutique-charcoal shadow-card">
+              <p className="text-xs font-semibold uppercase tracking-wider text-boutique-charcoalLight">Net Total</p>
+              <p className="mt-1 text-3xl font-bold">₹{data.total_amount.toFixed(2)}</p>
+            </div>
           </div>
-        )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-5">
+          <div className="space-y-3 border-b border-boutique-border p-6 md:col-span-3 md:border-b-0 md:border-r">
+            <div className="flex items-center justify-between rounded-lg bg-boutique-cream px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-boutique-charcoal shadow-sm">
+                  <ReceiptText className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-medium text-boutique-charcoalLight">Gross Total</span>
+              </div>
+              <span className="font-semibold text-boutique-charcoal">₹{grossTotal.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-boutique-roseLight/45 px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-boutique-roseDark shadow-sm">
+                  <Tag className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-medium text-boutique-charcoalLight">Net Discount</span>
+              </div>
+              <span className="font-semibold text-boutique-roseDark">-₹{data.discount_amount.toFixed(2)}</span>
+            </div>
+
+            <div className="flex items-center justify-between rounded-lg bg-boutique-creamDark px-4 py-3">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-boutique-charcoal shadow-sm">
+                  <CreditCard className="h-4 w-4" />
+                </span>
+                <span className="text-sm font-medium text-boutique-charcoalLight">Payment Mode</span>
+              </div>
+              <span className="font-semibold capitalize text-boutique-charcoal">{data.payment_mode}</span>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 p-6 md:col-span-2">
+            <div className="rounded-lg border border-emerald-200 bg-boutique-emeraldLight p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800">
+                <BadgeCheck className="h-4 w-4" />
+                Amount Paid
+              </div>
+              <p className="mt-3 text-2xl font-bold text-emerald-900">₹{data.amount_paid.toFixed(2)}</p>
+            </div>
+
+            <div className={`rounded-lg border p-4 ${outstandingDue > 0 ? 'border-red-200 bg-boutique-rubyLight' : 'border-emerald-200 bg-white'}`}>
+              <p className={`text-sm font-semibold ${outstandingDue > 0 ? 'text-red-800' : 'text-emerald-800'}`}>
+                {outstandingDue > 0 ? 'Outstanding Due' : 'Fully Settled'}
+              </p>
+              <p className={`mt-3 text-2xl font-bold ${outstandingDue > 0 ? 'text-red-900' : 'text-emerald-900'}`}>
+                ₹{outstandingDue.toFixed(2)}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>

@@ -12,20 +12,46 @@ type InventoryItem = { id: number; name: string; custom_code: string; selling_pr
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const [lowStockCount, setLowStockCount] = useState(0)
+  const LIMIT = 10
 
-  const fetchItems = async (q = '') => {
-    setLoading(true)
+  const fetchItems = async (q = '', isLoadMore = false) => {
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
+    const currentOffset = isLoadMore ? offset + LIMIT : 0
+    const params = new URLSearchParams({
+      limit: String(LIMIT),
+      offset: String(currentOffset)
+    })
+    if (q) params.set('q', q)
+
     try {
-      const res = await fetch(`/api/inventory${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+      const res = await fetch(`/api/inventory?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
-        setItems(data.items || [])
+        const newItems = data.items || []
+        if (isLoadMore) {
+          setItems(prev => [...prev, ...newItems])
+          setOffset(currentOffset)
+        } else {
+          setItems(newItems)
+          setOffset(0)
+        }
+        setTotalCount(data.count || 0)
+        setLowStockCount(data.low_stock_count || 0)
+        setHasMore(currentOffset + newItems.length < (data.count || 0))
       }
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -35,8 +61,6 @@ export default function InventoryPage() {
     e.preventDefault()
     fetchItems(search)
   }
-
-  const lowStockCount = items.filter(i => i.current_quantity < 5).length
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
@@ -79,7 +103,7 @@ export default function InventoryPage() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </form>
-          <span className="text-sm text-boutique-charcoalLight ml-auto">{items.length} items</span>
+          <span className="text-sm text-boutique-charcoalLight ml-auto">{items.length} of {totalCount} items</span>
         </div>
 
         <div className="overflow-x-auto">
@@ -88,6 +112,7 @@ export default function InventoryPage() {
           ) : items.length === 0 ? (
             <div className="p-12 text-center text-boutique-charcoalLight">No inventory items found.</div>
           ) : (
+            <>
             <table className="w-full text-left text-sm">
               <thead className="bg-boutique-creamDark/60 border-b border-boutique-border">
                 <tr>
@@ -136,6 +161,19 @@ export default function InventoryPage() {
                 })}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchItems(search, true)}
+                  disabled={loadingMore}
+                  className="min-w-[150px]"
+                >
+                  {loadingMore ? 'Loading More...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

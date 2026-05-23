@@ -133,7 +133,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
     try {
       const [mRes, bRes, lRes] = await Promise.all([
         fetch(`/api/bishi/${params.id}/members`),
-        fetch(`/api/bishi`),
+        fetch(`/api/bishi/${params.id}`),
         fetch(`/api/bishi/${params.id}/ledger`)
       ])
       
@@ -143,8 +143,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
       
       setMembers(mData.members || [])
       setLedger(lData.ledger || [])
-      const g = bData.bishi?.find((bg: any) => bg.id === Number(params.id))
-      setGroup(g)
+      setGroup(bData.bishi || null)
     } catch (e) {
       console.error(e)
     } finally {

@@ -12,20 +12,44 @@ type Customer = { id: number; name: string; phone: string; total_billed: number;
 export default function CustomersPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [search, setSearch] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const LIMIT = 10
 
-  const fetchCustomers = async (q = '') => {
-    setLoading(true)
+  const fetchCustomers = async (q = '', isLoadMore = false) => {
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
+    const currentOffset = isLoadMore ? offset + LIMIT : 0
+    const params = new URLSearchParams({
+      limit: String(LIMIT),
+      offset: String(currentOffset)
+    })
+    if (q) params.set('q', q)
+
     try {
-      const res = await fetch(`/api/customers${q ? `?q=${encodeURIComponent(q)}` : ''}`)
+      const res = await fetch(`/api/customers?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
-        setCustomers(data.customers || [])
+        const newCustomers = data.customers || []
+        if (isLoadMore) {
+          setCustomers(prev => [...prev, ...newCustomers])
+          setOffset(currentOffset)
+        } else {
+          setCustomers(newCustomers)
+          setOffset(0)
+        }
+        setTotalCount(data.count || 0)
+        setHasMore(currentOffset + newCustomers.length < (data.count || 0))
       }
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -57,7 +81,8 @@ export default function CustomersPage() {
             />
           </form>
           <div className="text-right text-sm text-boutique-charcoalLight font-medium">
-             Total Outstanding: <span className="text-red-500 font-bold ml-1">₹{customers.reduce((acc, c) => acc + Number(c.balance), 0).toFixed(2)}</span>
+             Loaded Outstanding: <span className="text-red-500 font-bold ml-1">₹{customers.reduce((acc, c) => acc + Number(c.balance), 0).toFixed(2)}</span>
+             <span className="block text-xs text-boutique-charcoalLight">{customers.length} of {totalCount} customers</span>
           </div>
         </div>
 
@@ -67,6 +92,7 @@ export default function CustomersPage() {
           ) : customers.length === 0 ? (
             <div className="p-8 text-center text-boutique-charcoalLight">No outstanding balances found!</div>
           ) : (
+            <>
             <table className="w-full text-left text-sm">
               <thead className="bg-boutique-creamDark/50 text-boutique-charcoal font-medium border-b border-boutique-border">
                 <tr>
@@ -108,6 +134,19 @@ export default function CustomersPage() {
                 ))}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchCustomers(search, true)}
+                  disabled={loadingMore}
+                  className="min-w-[150px]"
+                >
+                  {loadingMore ? 'Loading More...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

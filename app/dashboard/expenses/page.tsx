@@ -14,26 +14,51 @@ const CATEGORIES = ['salary', 'electricity', 'grocery', 'maintenance', 'transpor
 export default function ExpensesPage() {
   const [expenses, setExpenses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const LIMIT = 10
   
   const [typeFilter, setTypeFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
 
-  useEffect(() => {
-    setLoading(true)
+  const fetchExpenses = async (isLoadMore = false) => {
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
+    const currentOffset = isLoadMore ? offset + LIMIT : 0
     const params = new URLSearchParams()
     if (typeFilter) params.append('type', typeFilter)
     if (catFilter) params.append('category', catFilter)
+    params.append('limit', String(LIMIT))
+    params.append('offset', String(currentOffset))
     
     fetch(`/api/expenses?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
-        setExpenses(d.expenses || [])
+        const newExpenses = d.expenses || []
+        if (isLoadMore) {
+          setExpenses(prev => [...prev, ...newExpenses])
+          setOffset(currentOffset)
+        } else {
+          setExpenses(newExpenses)
+          setOffset(0)
+        }
+        setTotalCount(d.count || 0)
+        setHasMore(currentOffset + newExpenses.length < (d.count || 0))
         setLoading(false)
+        setLoadingMore(false)
       })
       .catch(e => {
         console.error(e)
         setLoading(false)
+        setLoadingMore(false)
       })
+  }
+
+  useEffect(() => {
+    fetchExpenses()
   }, [typeFilter, catFilter])
 
   return (
@@ -75,10 +100,11 @@ export default function ExpensesPage() {
            </select>
         </div>
         <div className="w-full md:w-1/3 text-right">
-           <div className="text-sm text-boutique-charcoalLight">Filtered Total</div>
+           <div className="text-sm text-boutique-charcoalLight">Loaded Total</div>
            <div className="font-serif text-2xl font-bold text-boutique-charcoal">
              ₹{expenses.reduce((acc, e) => acc + Number(e.amount), 0).toFixed(2)}
            </div>
+           <div className="text-xs text-boutique-charcoalLight">{expenses.length} of {totalCount} expenses</div>
         </div>
       </div>
 
@@ -89,6 +115,7 @@ export default function ExpensesPage() {
           ) : expenses.length === 0 ? (
             <div className="p-8 text-center text-boutique-charcoalLight">No expenses recorded.</div>
           ) : (
+            <>
             <table className="w-full text-left text-sm">
               <thead className="bg-boutique-creamDark/50 text-boutique-charcoal font-medium border-b border-boutique-border">
                 <tr>
@@ -120,6 +147,19 @@ export default function ExpensesPage() {
                 ))}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchExpenses(true)}
+                  disabled={loadingMore}
+                  className="min-w-[150px]"
+                >
+                  {loadingMore ? 'Loading More...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

@@ -10,7 +10,12 @@ import { Users, Plus, ArrowRight } from 'lucide-react'
 export default function BishiGroupsPage() {
   const [groups, setGroups] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [isAdding, setIsAdding] = useState(false)
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const LIMIT = 10
   
   // New Group Form
   const [name, setName] = useState('')
@@ -18,18 +23,36 @@ export default function BishiGroupsPage() {
   const [members, setMembers] = useState('')
   const [date, setDate] = useState('')
 
-  const fetchGroups = async () => {
-    setLoading(true)
+  const fetchGroups = async (isLoadMore = false) => {
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
+    const currentOffset = isLoadMore ? offset + LIMIT : 0
+    const params = new URLSearchParams({
+      limit: String(LIMIT),
+      offset: String(currentOffset)
+    })
+
     try {
-      const res = await fetch('/api/bishi')
+      const res = await fetch(`/api/bishi?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
-        setGroups(data.bishi || [])
+        const newGroups = data.bishi || []
+        if (isLoadMore) {
+          setGroups(prev => [...prev, ...newGroups])
+          setOffset(currentOffset)
+        } else {
+          setGroups(newGroups)
+          setOffset(0)
+        }
+        setTotalCount(data.count || 0)
+        setHasMore(currentOffset + newGroups.length < (data.count || 0))
       }
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }
 
@@ -101,6 +124,7 @@ export default function BishiGroupsPage() {
           <p className="text-boutique-charcoalLight">No Bishi groups found. Create one to get started.</p>
         </div>
       ) : (
+        <>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {groups.map((group) => (
             <div key={group.id} className="bg-white p-6 rounded-xl border border-boutique-border shadow-soft hover:shadow-md transition-shadow flex flex-col justify-between">
@@ -128,6 +152,19 @@ export default function BishiGroupsPage() {
             </div>
           ))}
         </div>
+        {hasMore && (
+          <div className="text-center">
+            <Button
+              variant="outline"
+              onClick={() => fetchGroups(true)}
+              disabled={loadingMore}
+              className="min-w-[150px]"
+            >
+              {loadingMore ? 'Loading More...' : `Load More (${groups.length} of ${totalCount})`}
+            </Button>
+          </div>
+        )}
+        </>
       )}
     </div>
   )

@@ -13,6 +13,10 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
   const [item, setItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [ledgerLoadingMore, setLedgerLoadingMore] = useState(false)
+  const [ledgerHasMore, setLedgerHasMore] = useState(false)
+  const [ledgerOffset, setLedgerOffset] = useState(0)
+  const LEDGER_LIMIT = 10
 
   // Editing Price State
   const [isEditingPrice, setIsEditingPrice] = useState(false)
@@ -24,12 +28,27 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
   const [restockCost, setRestockCost] = useState<number | ''>('')
   const [restocking, setRestocking] = useState(false)
 
-  const loadItem = async () => {
+  const loadItem = async (isLedgerLoadMore = false) => {
+    if (isLedgerLoadMore) setLedgerLoadingMore(true)
     try {
-      const res = await fetch(`/api/inventory/${params.id}`)
+      const currentLedgerOffset = isLedgerLoadMore ? ledgerOffset + LEDGER_LIMIT : 0
+      const res = await fetch(`/api/inventory/${params.id}?ledger_limit=${LEDGER_LIMIT}&ledger_offset=${currentLedgerOffset}`)
       const data = await res.json()
       if (res.ok) {
-        setItem(data.item)
+        if (isLedgerLoadMore) {
+          setItem((prev: any) => ({
+            ...data.item,
+            inventory_ledger: [
+              ...(prev?.inventory_ledger || []),
+              ...(data.item?.inventory_ledger || [])
+            ]
+          }))
+          setLedgerOffset(currentLedgerOffset)
+        } else {
+          setItem(data.item)
+          setLedgerOffset(0)
+        }
+        setLedgerHasMore(Boolean(data.ledger_has_more))
         setEditPriceVal(data.item.selling_price)
       } else {
         setError(data.error)
@@ -38,6 +57,7 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
       setError(e.message)
     } finally {
        setLoading(false)
+       setLedgerLoadingMore(false)
     }
   }
 
@@ -201,6 +221,7 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
           {item.inventory_ledger?.length === 0 ? (
              <div className="p-8 text-center text-gray-700">No ledger entries found.</div>
           ) : (
+            <>
             <table className="w-full text-left text-sm">
               <thead className="text-boutique-charcoal font-medium border-b border-gray-200 bg-white">
                 <tr>
@@ -236,6 +257,19 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
                  })}
               </tbody>
             </table>
+            {ledgerHasMore && (
+              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                <Button
+                  variant="outline"
+                  onClick={() => loadItem(true)}
+                  disabled={ledgerLoadingMore}
+                  className="min-w-[150px]"
+                >
+                  {ledgerLoadingMore ? 'Loading More...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>

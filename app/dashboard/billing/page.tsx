@@ -112,7 +112,7 @@ export default function BillingPage() {
                     <th className="px-6 py-4">Mode</th>
                     <th className="px-6 py-4 text-right">Total</th>
                     <th className="px-6 py-4 text-right">Paid</th>
-                    <th className="px-6 py-4 text-center">Action</th>
+                    <th className="px-6 py-4 text-center">View</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-boutique-border">

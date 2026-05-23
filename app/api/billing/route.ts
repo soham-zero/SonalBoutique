@@ -39,18 +39,33 @@ export async function POST(request: Request) {
     
     // Deconstruct payload
     const {
-      bill_items, // { inventory_id, quantity, discount }[]
-      job_items,  // { charge, cloth_provided_by, due_date }[]
+      bill_items = [], // { inventory_id, quantity, discount }[]
+      job_items = [],  // { charge, cloth_provided_by, due_date }[]
       payment_mode,
       amount_paid,
       customer_name,
       customer_phone,
       bishi_id,
-      bishi_member_id
+      bishi_member_id,
+      bill_date_time
     } = payload
 
     if (!bill_items.length && !job_items.length) {
       return NextResponse.json({ error: 'Must provide at least one bill item or job item.' }, { status: 400 })
+    }
+
+    let billDateTime: string | undefined
+    if (bill_date_time) {
+      const parsedBillDate = new Date(bill_date_time)
+      if (Number.isNaN(parsedBillDate.getTime())) {
+        return NextResponse.json({ error: 'Invalid bill date and time.' }, { status: 400 })
+      }
+
+      if (parsedBillDate.getTime() > Date.now()) {
+        return NextResponse.json({ error: 'Bill date and time cannot be in the future.' }, { status: 400 })
+      }
+
+      billDateTime = parsedBillDate.toISOString()
     }
 
     // Step 1: Pre-calculate bill items
@@ -99,7 +114,8 @@ export async function POST(request: Request) {
         payment_mode,
         total_amount,
         discount_amount,
-        amount_paid
+        amount_paid,
+        ...(billDateTime ? { date_time: billDateTime } : {})
       })
       .select('id, transaction_number')
       .single()
@@ -128,7 +144,8 @@ export async function POST(request: Request) {
       await (adminClient.from('inventory_ledger') as any).insert({
         inventory_id: item.inventory_id,
         quantity_added: -item.quantity,
-        cost_price: item.price_sold_at // using selling price for sold record reference as cost_price
+        cost_price: item.price_sold_at, // using selling price for sold record reference as cost_price
+        ...(billDateTime ? { date_time: billDateTime } : {})
       })
     }
 
@@ -146,7 +163,8 @@ export async function POST(request: Request) {
         await (adminClient.from('job_item_ledger') as any).insert({
           job_item_id: jobData.id,
           employee_name: 'System', // First entry
-          work: 'ordered'
+          work: 'ordered',
+          ...(billDateTime ? { changed_at: billDateTime } : {})
         })
       }
     }
@@ -193,7 +211,8 @@ export async function POST(request: Request) {
         transaction_id: txId,
         amount_billed: total_amount,
         amount_paid: finalAmountPaid,
-        due: due
+        due: due,
+        ...(billDateTime ? { date_time: billDateTime } : {})
       })
     }
 
@@ -204,7 +223,8 @@ export async function POST(request: Request) {
         transaction_id: txId,
         bishi_id: Number(bishi_id),
         bishi_member_id: Number(bishi_member_id),
-        redeemed: discount_amount
+        redeemed: discount_amount,
+        ...(billDateTime ? { date_time: billDateTime } : {})
       })
 
       // Update Member
@@ -215,7 +235,7 @@ export async function POST(request: Request) {
         await (adminClient.from('bishi_members') as any).update({
           total_redeemed: updatedRedeemed,
           balance: updatedBalance,
-          last_updated: new Date().toISOString()
+          last_updated: billDateTime || new Date().toISOString()
         }).eq('id', bishi_member_id)
       }
     }
@@ -227,4 +247,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }
-

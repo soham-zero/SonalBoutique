@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
+  const { searchParams } = new URL(request.url)
+  const ledgerLimit = Number(searchParams.get('ledger_limit')) || 10
+  const ledgerOffset = Number(searchParams.get('ledger_offset')) || 0
+
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -15,15 +19,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
       )
     `)
     .eq('id', Number(params.id))
+    .order('date_time', { ascending: false, foreignTable: 'inventory_ledger' })
+    .range(ledgerOffset, ledgerOffset + ledgerLimit - 1, { foreignTable: 'inventory_ledger' })
     .single()
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  if (data?.inventory_ledger) {
-      data.inventory_ledger.sort((a: any, b: any) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())
-  }
-
-  return NextResponse.json({ item: data })
+  return NextResponse.json({
+    item: data,
+    ledger_has_more: (data?.inventory_ledger?.length || 0) === ledgerLimit
+  })
 }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {

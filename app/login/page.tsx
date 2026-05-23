@@ -2,10 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const router = useRouter()
@@ -37,31 +39,31 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-boutique-creamDark px-4 relative">
+    <div className="relative flex min-h-screen items-center justify-center bg-boutique-creamDark px-4">
       {loading && (
-        <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-50 flex flex-col items-center justify-center transition-all duration-300">
-          <div className="w-12 h-12 border-4 border-boutique-rose border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="font-serif text-lg font-bold text-boutique-charcoal animate-pulse">Authenticating...</p>
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm transition-all duration-300">
+          <div className="mb-4 h-12 w-12 animate-spin rounded-full border-4 border-boutique-rose border-t-transparent"></div>
+          <p className="animate-pulse font-serif text-lg font-bold text-boutique-charcoal">Authenticating...</p>
         </div>
       )}
 
-      <div className="w-full max-w-md bg-white p-8 rounded-xl shadow-soft border border-boutique-border space-y-8 z-10">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-serif font-bold text-boutique-charcoal tracking-tight">
+      <div className="z-10 w-full max-w-md space-y-8 rounded-xl border border-boutique-border bg-white p-8 shadow-soft">
+        <div className="space-y-2 text-center">
+          <h1 className="font-serif text-4xl font-bold tracking-tight text-boutique-charcoal">
             Sonal Boutique
           </h1>
-          <p className="text-sm font-medium text-boutique-charcoalLight uppercase tracking-wider">
+          <p className="text-sm font-medium uppercase tracking-wider text-boutique-charcoalLight">
             Management Portal
           </p>
         </div>
 
         <form onSubmit={handleLogin} className="space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 text-red-600 text-sm rounded-md border border-red-200 shadow-sm animate-in shake-in-1">
+            <div className="animate-in shake-in-1 rounded-md border border-red-200 bg-red-50 p-4 text-sm text-red-600 shadow-sm">
               {error}
             </div>
           )}
-          
+
           <div className="space-y-2">
             <label className="text-sm font-bold text-boutique-charcoal" htmlFor="email">
               Email Address
@@ -73,7 +75,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               disabled={loading}
-              className="w-full px-4 py-3 border border-boutique-border rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-boutique-roseLight focus:border-transparent transition-all shadow-sm"
+              className="w-full rounded-md border border-boutique-border px-4 py-3 text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-boutique-roseLight"
               placeholder="admin@sonalboutique.com"
             />
           </div>
@@ -82,24 +84,36 @@ export default function LoginPage() {
             <label className="text-sm font-bold text-boutique-charcoal" htmlFor="password">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              disabled={loading}
-              className="w-full px-4 py-3 border border-boutique-border rounded-md text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-boutique-roseLight focus:border-transparent transition-all shadow-sm"
-              placeholder="••••••••"
-            />
+            <div className="relative">
+              <input
+                id="password"
+                type={showPassword ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={loading}
+                className="w-full rounded-md border border-boutique-border px-4 py-3 pr-12 text-gray-900 placeholder-gray-400 shadow-sm transition-all focus:border-transparent focus:outline-none focus:ring-2 focus:ring-boutique-roseLight"
+                placeholder="Enter your password"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                disabled={loading}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                className="absolute inset-y-0 right-0 flex items-center px-4 text-boutique-charcoalLight transition-colors hover:text-boutique-charcoal focus:outline-none focus:text-boutique-charcoal disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-boutique-charcoal text-white py-3.5 rounded-md hover:bg-boutique-charcoalLight transition-all font-bold uppercase tracking-widest text-xs disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:shadow-lg active:scale-[0.98]"
+            className="w-full rounded-md bg-boutique-charcoal py-3.5 text-xs font-bold uppercase tracking-widest text-white shadow-md transition-all hover:bg-boutique-charcoalLight hover:shadow-lg active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {loading ? 'Authenticating...' : 'Sign In Now'}
+            {loading ? 'Authenticating...' : 'Sign In'}
           </button>
         </form>
       </div>

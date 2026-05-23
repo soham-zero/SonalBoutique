@@ -14,13 +14,26 @@ export default function JobWorkPage() {
   const [activeTab, setActiveTab] = useState<'tracker' | 'inventory'>('tracker')
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [filter, setFilter] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const LIMIT = 10
 
-  useEffect(() => {
+  const fetchJobs = async (isLoadMore = false) => {
     if (activeTab !== 'tracker') return
-    setLoading(true)
-    const q = filter ? `?status=${filter}` : ''
-    fetch(`/api/billing/jobwork${q}`)
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
+    const currentOffset = isLoadMore ? offset + LIMIT : 0
+    const params = new URLSearchParams({
+      limit: String(LIMIT),
+      offset: String(currentOffset)
+    })
+    if (filter) params.set('status', filter)
+
+    fetch(`/api/billing/jobwork?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
         const fetchedJobs = d.jobs || []
@@ -38,13 +51,27 @@ export default function JobWorkPage() {
           return statusA - statusB
         })
         
-        setJobs(fetchedJobs)
+        if (isLoadMore) {
+          setJobs(prev => [...prev, ...fetchedJobs])
+          setOffset(currentOffset)
+        } else {
+          setJobs(fetchedJobs)
+          setOffset(0)
+        }
+        setTotalCount(d.count || 0)
+        setHasMore(currentOffset + fetchedJobs.length < (d.count || 0))
         setLoading(false)
+        setLoadingMore(false)
       })
       .catch(e => {
         console.error(e)
         setLoading(false)
+        setLoadingMore(false)
       })
+  }
+
+  useEffect(() => {
+    fetchJobs()
   }, [filter, activeTab])
 
   const isOverdue = (dateString: string | null) => {
@@ -110,7 +137,7 @@ export default function JobWorkPage() {
                 </Button>
               ))}
             </div>
-            <span className="text-sm text-boutique-charcoalLight ml-auto font-medium">{jobs.length} Jobs</span>
+            <span className="text-sm text-boutique-charcoalLight ml-auto font-medium">{jobs.length} of {totalCount} Jobs</span>
           </div>
 
           <div className="bg-white rounded-2xl shadow-soft border border-boutique-border overflow-hidden">
@@ -120,6 +147,7 @@ export default function JobWorkPage() {
               ) : jobs.length === 0 ? (
                 <div className="p-12 text-center text-boutique-charcoalLight">No active job work found.</div>
               ) : (
+                <>
                 <table className="w-full text-left text-sm">
                   <thead className="bg-boutique-creamDark/60 font-semibold text-xs uppercase tracking-wider text-boutique-charcoalLight border-b border-boutique-border">
                     <tr>
@@ -188,6 +216,19 @@ export default function JobWorkPage() {
                     })}
                   </tbody>
                 </table>
+                {hasMore && (
+                  <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                    <Button
+                      variant="outline"
+                      onClick={() => fetchJobs(true)}
+                      disabled={loadingMore}
+                      className="min-w-[150px]"
+                    >
+                      {loadingMore ? 'Loading More...' : 'Load More'}
+                    </Button>
+                  </div>
+                )}
+                </>
               )}
             </div>
           </div>
@@ -200,4 +241,3 @@ export default function JobWorkPage() {
     </div>
   )
 }
-

@@ -42,7 +42,6 @@ export default function AddExpensePage() {
       }
 
       router.push('/dashboard/expenses')
-      router.refresh()
     } catch (err: any) {
       setError(err.message)
     } finally {

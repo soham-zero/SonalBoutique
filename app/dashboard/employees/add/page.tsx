@@ -30,7 +30,6 @@ export default function AddEmployeePage() {
       }
 
       router.push('/dashboard/employees')
-      router.refresh()
     } catch (err: any) {
       setError(err.message)
     } finally {

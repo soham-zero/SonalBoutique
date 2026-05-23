@@ -8,10 +8,14 @@ import { Input } from '@/components/ui/Input'
 import { Package, ArrowLeft, Info } from 'lucide-react'
 import Link from 'next/link'
 
+const CUSTOM_CODE_REGEX = /^[A-Z]+-\d+$/
+const CUSTOM_CODE_ERROR = 'Custom code must follow CAPITALLETTERS-NUMBERS, e.g. DRESS-001.'
+
 export default function AddInventoryPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [customCodeError, setCustomCodeError] = useState<string | null>(null)
   
   const [customCode, setCustomCode] = useState('')
   const [name, setName] = useState('')
@@ -21,15 +25,23 @@ export default function AddInventoryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setLoading(true)
     setError(null)
+    setCustomCodeError(null)
+
+    const normalizedCustomCode = customCode.trim()
+    if (!CUSTOM_CODE_REGEX.test(normalizedCustomCode)) {
+      setCustomCodeError(CUSTOM_CODE_ERROR)
+      return
+    }
+
+    setLoading(true)
 
     try {
       const res = await fetch('/api/inventory', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          custom_code: customCode,
+          custom_code: normalizedCustomCode,
           name,
           current_quantity: Number(currentQuantity) || 0,
           selling_price: Number(sellingPrice),
@@ -43,7 +55,6 @@ export default function AddInventoryPage() {
       }
 
       router.push('/dashboard/inventory')
-      router.refresh()
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -82,7 +93,16 @@ export default function AddInventoryPage() {
                 label="Custom Code" 
                 placeholder="e.g. DRESS-001"
                 value={customCode}
-                onChange={(e) => setCustomCode(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value
+                  setCustomCode(nextValue)
+                  setCustomCodeError(
+                    nextValue.trim() && !CUSTOM_CODE_REGEX.test(nextValue.trim())
+                      ? CUSTOM_CODE_ERROR
+                      : null
+                  )
+                }}
+                error={customCodeError || undefined}
                 required
               />
               <Input 
@@ -104,16 +124,17 @@ export default function AddInventoryPage() {
                 required
               />
               <Input 
-                label="Cost Price (₹)" 
+                label="Cost Price/Unit (₹)" 
                 type="number"
                 min={0}
                 step="0.01"
                 placeholder="0.00"
                 value={costPrice}
                 onChange={(e) => setCostPrice(e.target.value ? Number(e.target.value) : '')}
+                required
               />
               <Input 
-                label="Selling Price (₹)" 
+                label="Selling Price/Unit (₹)" 
                 type="number"
                 min={0}
                 step="0.01"

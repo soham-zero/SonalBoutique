@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -19,26 +19,48 @@ type LedgerEntry = {
 export default function InventoryLedgerPage() {
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [q, setQ] = useState('')
   const [type, setType] = useState('')       // '' | 'added' | 'consumed'
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
+  const [hasMore, setHasMore] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const offsetRef = useRef(0)
+  const LIMIT = 10
 
-  const fetchLedger = useCallback(async () => {
-    setLoading(true)
+  const fetchLedger = useCallback(async (isLoadMore = false) => {
+    if (isLoadMore) setLoadingMore(true)
+    else setLoading(true)
+
     try {
+      const currentOffset = isLoadMore ? offsetRef.current + LIMIT : 0
       const params = new URLSearchParams()
       if (q)    params.set('q', q)
       if (type) params.set('type', type)
       if (from) params.set('from', from)
       if (to)   params.set('to', to)
+      params.set('limit', String(LIMIT))
+      params.set('offset', String(currentOffset))
       const res = await fetch(`/api/inventory/ledger?${params.toString()}`)
       if (res.ok) {
         const data = await res.json()
-        setEntries(data.ledger || [])
+        const newEntries = data.ledger || []
+        if (isLoadMore) {
+          setEntries(prev => [...prev, ...newEntries])
+          offsetRef.current = currentOffset
+        } else {
+          setEntries(newEntries)
+          offsetRef.current = 0
+        }
+        setTotalCount(data.count || 0)
+        setHasMore(currentOffset + newEntries.length < (data.count || 0))
       }
     } catch (e) { console.error(e) }
-    finally { setLoading(false) }
+    finally {
+      setLoading(false)
+      setLoadingMore(false)
+    }
   }, [q, type, from, to])
 
   useEffect(() => { fetchLedger() }, [fetchLedger])
@@ -69,7 +91,7 @@ export default function InventoryLedgerPage() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-boutique-border shadow-soft p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-boutique-charcoalLight">Total Entries</p>
-          <p className="text-2xl font-bold text-boutique-charcoal mt-1">{entries.length}</p>
+          <p className="text-2xl font-bold text-boutique-charcoal mt-1">{entries.length} / {totalCount}</p>
         </div>
         <div className="bg-boutique-emeraldLight rounded-2xl border border-emerald-200 shadow-soft p-4">
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-700">Total Added</p>
@@ -158,6 +180,7 @@ export default function InventoryLedgerPage() {
           ) : entries.length === 0 ? (
             <div className="p-12 text-center text-boutique-charcoalLight">No ledger entries match your filters.</div>
           ) : (
+            <>
             <table className="w-full text-left text-sm">
               <thead className="bg-boutique-creamDark/60 border-b border-boutique-border">
                 <tr>
@@ -214,6 +237,19 @@ export default function InventoryLedgerPage() {
                 })}
               </tbody>
             </table>
+            {hasMore && (
+              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
+                <Button
+                  variant="outline"
+                  onClick={() => fetchLedger(true)}
+                  disabled={loadingMore}
+                  className="min-w-[150px]"
+                >
+                  {loadingMore ? 'Loading More...' : 'Load More'}
+                </Button>
+              </div>
+            )}
+            </>
           )}
         </div>
       </div>
