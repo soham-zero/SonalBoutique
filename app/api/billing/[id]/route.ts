@@ -12,12 +12,16 @@ export async function GET(request: Request, { params }: { params: { id: string }
     .from('transactions')
     .select(`
       *,
+      customers (
+        name,
+        phone
+      ),
       bill_items (
-        id, quantity, price_sold_at, discount, amount, inventory_id,
+        id, quantity, price_sold_at, amount, inventory_id,
         inventory ( name, custom_code )
       ),
       job_items (
-        id, charge, cloth_provided_by, status, due_date
+        id, name, description, charge, cloth_provided_by, status, due_date
       ),
       bishi_sales (
         id, bishi_id, bishi_member_id, redeemed,
@@ -25,10 +29,11 @@ export async function GET(request: Request, { params }: { params: { id: string }
         bishi_members ( name )
       )
     `)
-    .eq('id', Number(params.id))
+    .eq('id', params.id)
     .single()
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   return NextResponse.json({ transaction: data })
 }
+

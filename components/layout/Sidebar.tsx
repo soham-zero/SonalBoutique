@@ -15,19 +15,21 @@ import {
   LineChart, 
   LogOut,
   Menu,
-  X
+  X,
+  History
 } from 'lucide-react'
 import clsx from 'clsx'
 
 const NAV_ITEMS = [
-  { name: 'Billing',    path: '/dashboard/billing',    icon: Receipt,     color: 'text-boutique-indigo',  activeBg: 'bg-boutique-indigoLight'  },
-  { name: 'Inventory',  path: '/dashboard/inventory',  icon: Package,     color: 'text-boutique-emerald', activeBg: 'bg-boutique-emeraldLight' },
-  { name: 'Job Work',   path: '/dashboard/jobwork',    icon: Scissors,    color: 'text-boutique-amber',   activeBg: 'bg-boutique-amberLight'   },
-  { name: 'Customers',  path: '/dashboard/customers',  icon: Users,       color: 'text-boutique-roseDark',activeBg: 'bg-boutique-roseLight'    },
-  { name: 'Expenses',   path: '/dashboard/expenses',   icon: CreditCard,  color: 'text-boutique-ruby',    activeBg: 'bg-boutique-rubyLight'    },
-  { name: 'Employees',  path: '/dashboard/employees',  icon: UserSquare2, color: 'text-boutique-teal',    activeBg: 'bg-boutique-tealLight'    },
-  { name: 'Bishi',      path: '/dashboard/bishi',      icon: UsersRound,  color: 'text-boutique-teal',    activeBg: 'bg-boutique-tealLight'    },
-  { name: 'Analytics',  path: '/dashboard/analytics',  icon: LineChart,   color: 'text-boutique-indigo',  activeBg: 'bg-boutique-indigoLight'  },
+  { name: 'New Bill',     path: '/dashboard/billing',          icon: Receipt,     color: 'text-boutique-indigo',  activeBg: 'bg-boutique-indigoLight'  },
+  { name: 'Bill History', path: '/dashboard/billing/history',  icon: History,     color: 'text-boutique-indigo',  activeBg: 'bg-boutique-indigoLight'  },
+  { name: 'Inventory',    path: '/dashboard/inventory',        icon: Package,     color: 'text-boutique-emerald', activeBg: 'bg-boutique-emeraldLight' },
+  { name: 'Job Work',     path: '/dashboard/jobwork',          icon: Scissors,    color: 'text-boutique-amber',   activeBg: 'bg-boutique-amberLight'   },
+  { name: 'Customers',    path: '/dashboard/customers',        icon: Users,       color: 'text-boutique-roseDark',activeBg: 'bg-boutique-roseLight'    },
+  { name: 'Expenses',     path: '/dashboard/expenses',         icon: CreditCard,  color: 'text-boutique-ruby',    activeBg: 'bg-boutique-rubyLight'    },
+  { name: 'Employees',    path: '/dashboard/employees',        icon: UserSquare2, color: 'text-boutique-teal',    activeBg: 'bg-boutique-tealLight'    },
+  { name: 'Bishi',        path: '/dashboard/bishi',            icon: UsersRound,  color: 'text-boutique-teal',    activeBg: 'bg-boutique-tealLight'    },
+  { name: 'Analytics',    path: '/dashboard/analytics',        icon: LineChart,   color: 'text-boutique-indigo',  activeBg: 'bg-boutique-indigoLight'  },
 ]
 
 export function Sidebar() {
@@ -64,7 +66,12 @@ export function Sidebar() {
         </p>
         <ul className="space-y-0.5 px-3">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.path || pathname.startsWith(`${item.path}/`)
+            const isActive = 
+              item.path === '/dashboard/billing'
+                ? pathname === '/dashboard/billing'
+                : item.path === '/dashboard/billing/history'
+                  ? pathname.startsWith('/dashboard/billing') && pathname !== '/dashboard/billing'
+                  : pathname === item.path || pathname.startsWith(`${item.path}/`)
             return (
               <li key={item.path}>
                 <Link

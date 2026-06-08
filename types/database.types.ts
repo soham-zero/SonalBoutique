@@ -11,45 +11,160 @@ export type Database = {
     Tables: {
       inventory: {
         Row: {
-          id: number
+          id: string
           custom_code: string
           name: string
           current_quantity: number
           selling_price: number
         }
         Insert: {
-          id?: number
+          id?: string
           custom_code: string
           name: string
           current_quantity?: number
           selling_price: number
         }
         Update: {
-          id?: number
+          id?: string
           custom_code?: string
           name?: string
           current_quantity?: number
           selling_price?: number
         }
       }
+      employees: {
+        Row: {
+          id: string
+          name: string
+        }
+        Insert: {
+          id?: string
+          name: string
+        }
+        Update: {
+          id?: string
+          name?: string
+        }
+      }
+      customers: {
+        Row: {
+          id: string
+          name: string
+          phone: string
+          total_billed: number
+          total_paid: number
+          balance: number
+        }
+        Insert: {
+          id?: string
+          name: string
+          phone: string
+          total_billed?: number
+          total_paid?: number
+          balance?: number
+        }
+        Update: {
+          id?: string
+          name?: string
+          phone?: string
+          total_billed?: number
+          total_paid?: number
+          balance?: number
+        }
+      }
+      bishi: {
+        Row: {
+          id: string
+          name: string
+          contribution_amount: number
+          total_members: number
+          started_at: string | null
+          notes: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          contribution_amount: number
+          total_members: number
+          started_at?: string | null
+          notes?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          contribution_amount?: number
+          total_members?: number
+          started_at?: string | null
+          notes?: string | null
+        }
+      }
+      job_work_inventory: {
+        Row: {
+          id: string
+          custom_code: string
+          name: string
+          current_quantity: number
+          unit: Database["public"]["Enums"]["unit_enum"]
+        }
+        Insert: {
+          id?: string
+          custom_code: string
+          name: string
+          current_quantity?: number
+          unit: Database["public"]["Enums"]["unit_enum"]
+        }
+        Update: {
+          id?: string
+          custom_code?: string
+          name?: string
+          current_quantity?: number
+          unit?: Database["public"]["Enums"]["unit_enum"]
+        }
+      }
+      expenses: {
+        Row: {
+          id: string
+          expense_type: Database["public"]["Enums"]["expense_type_enum"]
+          category: Database["public"]["Enums"]["expense_category_enum"]
+          description: string | null
+          amount: number
+          date_time: string
+        }
+        Insert: {
+          id?: string
+          expense_type: Database["public"]["Enums"]["expense_type_enum"]
+          category: Database["public"]["Enums"]["expense_category_enum"]
+          description?: string | null
+          amount: number
+          date_time?: string
+        }
+        Update: {
+          id?: string
+          expense_type?: Database["public"]["Enums"]["expense_type_enum"]
+          category?: Database["public"]["Enums"]["expense_category_enum"]
+          description?: string | null
+          amount?: number
+          date_time?: string
+        }
+      }
       inventory_ledger: {
         Row: {
-          id: number
-          inventory_id: number
+          id: string
+          inventory_id: string
           quantity_added: number
           cost_price: number
           date_time: string
         }
         Insert: {
-          id?: number
-          inventory_id: number
+          id?: string
+          inventory_id: string
           quantity_added: number
           cost_price: number
           date_time?: string
         }
         Update: {
-          id?: number
-          inventory_id?: number
+          id?: string
+          inventory_id?: string
           quantity_added?: number
           cost_price?: number
           date_time?: string
@@ -57,10 +172,9 @@ export type Database = {
       }
       transactions: {
         Row: {
-          id: number
-          transaction_number: number
-          customer_name: string | null
-          customer_phone: string | null
+          id: string
+          bill_number: string
+          customer_id: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
           total_amount: number
           discount_amount: number
@@ -68,10 +182,9 @@ export type Database = {
           date_time: string
         }
         Insert: {
-          id?: number
-          transaction_number?: number
-          customer_name?: string | null
-          customer_phone?: string | null
+          id?: string
+          bill_number: string
+          customer_id?: string | null
           payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
           total_amount: number
           discount_amount?: number
@@ -79,10 +192,9 @@ export type Database = {
           date_time?: string
         }
         Update: {
-          id?: number
-          transaction_number?: number
-          customer_name?: string | null
-          customer_phone?: string | null
+          id?: string
+          bill_number?: string
+          customer_id?: string | null
           payment_mode?: Database["public"]["Enums"]["payment_mode_enum"]
           total_amount?: number
           discount_amount?: number
@@ -90,144 +202,84 @@ export type Database = {
           date_time?: string
         }
       }
-      bill_items: {
+      customer_payments: {
         Row: {
-          id: number
-          transaction_id: number
-          inventory_id: number
-          quantity: number
-          price_sold_at: number
-          discount: number
-          amount: number
+          id: string
+          customer_id: string
+          amount_paid: number
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
+          payment_date: string
+          notes: string | null
         }
         Insert: {
-          id?: number
-          transaction_id: number
-          inventory_id: number
-          quantity: number
-          price_sold_at: number
-          discount?: number
-          amount: number
+          id?: string
+          customer_id: string
+          amount_paid: number
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
+          payment_date?: string
+          notes?: string | null
         }
         Update: {
-          id?: number
-          transaction_id?: number
-          inventory_id?: number
-          quantity?: number
-          price_sold_at?: number
-          discount?: number
-          amount?: number
+          id?: string
+          customer_id?: string
+          amount_paid?: number
+          payment_mode?: Database["public"]["Enums"]["payment_mode_enum"]
+          payment_date?: string
+          notes?: string | null
         }
       }
-      job_items: {
+      bishi_members: {
         Row: {
-          id: number
-          transaction_id: number
-          charge: number
-          cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
-          status: Database["public"]["Enums"]["job_status_enum"]
-          due_date: string | null
-        }
-        Insert: {
-          id?: number
-          transaction_id: number
-          charge: number
-          cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
-          status?: Database["public"]["Enums"]["job_status_enum"]
-          due_date?: string | null
-        }
-        Update: {
-          id?: number
-          transaction_id?: number
-          charge?: number
-          cloth_provided_by?: Database["public"]["Enums"]["cloth_provided_enum"]
-          status?: Database["public"]["Enums"]["job_status_enum"]
-          due_date?: string | null
-        }
-      }
-      job_item_ledger: {
-        Row: {
-          id: number
-          job_item_id: number
-          employee_id: number | null
-          employee_name: string
-          work: Database["public"]["Enums"]["job_status_enum"]
-          changed_at: string
-        }
-        Insert: {
-          id?: number
-          job_item_id: number
-          employee_id?: number | null
-          employee_name: string
-          work: Database["public"]["Enums"]["job_status_enum"]
-          changed_at?: string
-        }
-        Update: {
-          id?: number
-          job_item_id?: number
-          employee_id?: number | null
-          employee_name?: string
-          work?: Database["public"]["Enums"]["job_status_enum"]
-          changed_at?: string
-        }
-      }
-      employees: {
-        Row: {
-          id: number
+          id: string
+          bishi_id: string
           name: string
+          phone: string | null
+          total_contributed: number
+          total_redeemed: number
+          balance: number
+          joined_at: string
         }
         Insert: {
-          id?: number
+          id?: string
+          bishi_id: string
           name: string
+          phone?: string | null
+          total_contributed?: number
+          total_redeemed?: number
+          balance?: number
+          joined_at?: string
         }
         Update: {
-          id?: number
+          id?: string
+          bishi_id?: string
           name?: string
-        }
-      }
-      job_work_inventory: {
-        Row: {
-          id: number
-          custom_code: string
-          name: string
-          current_quantity: number
-          unit: Database["public"]["Enums"]["unit_enum"]
-        }
-        Insert: {
-          id?: number
-          custom_code: string
-          name: string
-          current_quantity?: number
-          unit: Database["public"]["Enums"]["unit_enum"]
-        }
-        Update: {
-          id?: number
-          custom_code?: string
-          name?: string
-          current_quantity?: number
-          unit?: Database["public"]["Enums"]["unit_enum"]
+          phone?: string | null
+          total_contributed?: number
+          total_redeemed?: number
+          balance?: number
+          joined_at?: string
         }
       }
       job_work_inventory_purchases: {
         Row: {
-          id: number
-          job_work_inventory_id: number
+          id: string
+          job_work_inventory_id: string
           quantity_added: number
           cost_price: number
           date_time: string
           notes: string | null
         }
         Insert: {
-          id?: number
-          job_work_inventory_id: number
+          id?: string
+          job_work_inventory_id: string
           quantity_added: number
           cost_price: number
           date_time?: string
           notes?: string | null
         }
         Update: {
-          id?: number
-          job_work_inventory_id?: number
+          id?: string
+          job_work_inventory_id?: string
           quantity_added?: number
           cost_price?: number
           date_time?: string
@@ -236,196 +288,106 @@ export type Database = {
       }
       job_work_inventory_audits: {
         Row: {
-          id: number
-          job_work_inventory_id: number
-          previous_quantity: number
-          current_quantity: number
+          id: string
+          job_work_inventory_id: string
           consumed: number
           date_time: string
           notes: string | null
         }
         Insert: {
-          id?: number
-          job_work_inventory_id: number
-          previous_quantity: number
-          current_quantity: number
+          id?: string
+          job_work_inventory_id: string
           consumed: number
           date_time?: string
           notes?: string | null
         }
         Update: {
-          id?: number
-          job_work_inventory_id?: number
-          previous_quantity?: number
-          current_quantity?: number
+          id?: string
+          job_work_inventory_id?: string
           consumed?: number
           date_time?: string
           notes?: string | null
         }
       }
-      expenses: {
+      bill_items: {
         Row: {
-          id: number
-          expense_type: Database["public"]["Enums"]["expense_type_enum"]
-          category: Database["public"]["Enums"]["expense_category_enum"]
-          description: string | null
+          id: string
+          transaction_id: string
+          inventory_id: string
+          quantity: number
+          price_sold_at: number
           amount: number
-          date_time: string
         }
         Insert: {
-          id?: number
-          expense_type: Database["public"]["Enums"]["expense_type_enum"]
-          category: Database["public"]["Enums"]["expense_category_enum"]
-          description?: string | null
+          id?: string
+          transaction_id: string
+          inventory_id: string
+          quantity: number
+          price_sold_at: number
           amount: number
-          date_time?: string
         }
         Update: {
-          id?: number
-          expense_type?: Database["public"]["Enums"]["expense_type_enum"]
-          category?: Database["public"]["Enums"]["expense_category_enum"]
-          description?: string | null
+          id?: string
+          transaction_id?: string
+          inventory_id?: string
+          quantity?: number
+          price_sold_at?: number
           amount?: number
-          date_time?: string
         }
       }
-      customers: {
+      job_items: {
         Row: {
-          id: number
+          id: string
+          transaction_id: string
           name: string
-          phone: string
-          total_billed: number
-          total_paid: number
-          balance: number
+          description: string | null
+          charge: number
+          cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
+          status: Database["public"]["Enums"]["job_status_enum"]
+          due_date: string | null
         }
         Insert: {
-          id?: number
+          id?: string
+          transaction_id: string
           name: string
-          phone: string
-          total_billed?: number
-          total_paid?: number
-          balance?: number
+          description?: string | null
+          charge: number
+          cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
+          status?: Database["public"]["Enums"]["job_status_enum"]
+          due_date?: string | null
         }
         Update: {
-          id?: number
+          id?: string
+          transaction_id?: string
           name?: string
-          phone?: string
-          total_billed?: number
-          total_paid?: number
-          balance?: number
-        }
-      }
-      customer_balance_ledger: {
-        Row: {
-          id: number
-          customer_id: number
-          transaction_id: number | null
-          amount_billed: number
-          amount_paid: number
-          due: number
-          date_time: string
-        }
-        Insert: {
-          id?: number
-          customer_id: number
-          transaction_id?: number | null
-          amount_billed: number
-          amount_paid: number
-          due: number
-          date_time?: string
-        }
-        Update: {
-          id?: number
-          customer_id?: number
-          transaction_id?: number | null
-          amount_billed?: number
-          amount_paid?: number
-          due?: number
-          date_time?: string
-        }
-      }
-      bishi: {
-        Row: {
-          id: number
-          name: string
-          contribution_amount: number
-          total_members: number
-          started_at: string | null
-          notes: string | null
-        }
-        Insert: {
-          id?: number
-          name: string
-          contribution_amount: number
-          total_members: number
-          started_at?: string | null
-          notes?: string | null
-        }
-        Update: {
-          id?: number
-          name?: string
-          contribution_amount?: number
-          total_members?: number
-          started_at?: string | null
-          notes?: string | null
-        }
-      }
-      bishi_members: {
-        Row: {
-          id: number
-          bishi_id: number
-          name: string
-          phone: string | null
-          total_contributed: number
-          total_redeemed: number
-          balance: number
-          last_updated: string | null
-          joined_at: string
-        }
-        Insert: {
-          id?: number
-          bishi_id: number
-          name: string
-          phone?: string | null
-          total_contributed?: number
-          total_redeemed?: number
-          balance?: number
-          last_updated?: string | null
-          joined_at?: string
-        }
-        Update: {
-          id?: number
-          bishi_id?: number
-          name?: string
-          phone?: string | null
-          total_contributed?: number
-          total_redeemed?: number
-          balance?: number
-          last_updated?: string | null
-          joined_at?: string
+          description?: string | null
+          charge?: number
+          cloth_provided_by?: Database["public"]["Enums"]["cloth_provided_enum"]
+          status?: Database["public"]["Enums"]["job_status_enum"]
+          due_date?: string | null
         }
       }
       bishi_ledger: {
         Row: {
-          id: number
-          bishi_id: number
-          bishi_member_id: number
+          id: string
+          bishi_id: string
+          bishi_member_id: string
           contribution_amount: number
           notes: string | null
           date_time: string
         }
         Insert: {
-          id?: number
-          bishi_id: number
-          bishi_member_id: number
+          id?: string
+          bishi_id: string
+          bishi_member_id: string
           contribution_amount: number
           notes?: string | null
           date_time?: string
         }
         Update: {
-          id?: number
-          bishi_id?: number
-          bishi_member_id?: number
+          id?: string
+          bishi_id?: string
+          bishi_member_id?: string
           contribution_amount?: number
           notes?: string | null
           date_time?: string
@@ -433,28 +395,71 @@ export type Database = {
       }
       bishi_sales: {
         Row: {
-          id: number
-          transaction_id: number
-          bishi_id: number
-          bishi_member_id: number
+          id: string
+          transaction_id: string
+          bishi_id: string
+          bishi_member_id: string
           redeemed: number
           date_time: string
         }
         Insert: {
-          id?: number
-          transaction_id: number
-          bishi_id: number
-          bishi_member_id: number
+          id?: string
+          transaction_id: string
+          bishi_id: string
+          bishi_member_id: string
           redeemed: number
           date_time?: string
         }
         Update: {
-          id?: number
-          transaction_id?: number
-          bishi_id?: number
-          bishi_member_id?: number
+          id?: string
+          transaction_id?: string
+          bishi_id?: string
+          bishi_member_id?: string
           redeemed?: number
           date_time?: string
+        }
+      }
+      bishi_bill_items: {
+        Row: {
+          id: string
+          bill_item_id: string
+          bishi_id: string
+          bishi_member_id: string
+        }
+        Insert: {
+          id?: string
+          bill_item_id: string
+          bishi_id: string
+          bishi_member_id: string
+        }
+        Update: {
+          id?: string
+          bill_item_id?: string
+          bishi_id?: string
+          bishi_member_id?: string
+        }
+      }
+      job_item_ledger: {
+        Row: {
+          id: string
+          job_item_id: string
+          employee_id: string
+          work: Database["public"]["Enums"]["job_status_enum"]
+          changed_at: string
+        }
+        Insert: {
+          id?: string
+          job_item_id: string
+          employee_id: string
+          work: Database["public"]["Enums"]["job_status_enum"]
+          changed_at?: string
+        }
+        Update: {
+          id?: string
+          job_item_id?: string
+          employee_id?: string
+          work?: Database["public"]["Enums"]["job_status_enum"]
+          changed_at?: string
         }
       }
     }
@@ -467,7 +472,7 @@ export type Database = {
     Enums: {
       payment_mode_enum: "cash" | "upi" | "split" | "credit" | "debit"
       cloth_provided_enum: "customer" | "boutique"
-      job_status_enum: "ordered" | "preparation" | "cutting" | "stitching" | "finishing" | "ironing" | "complete"
+      job_status_enum: "ordered" | "preparation" | "cutting" | "stitching" | "finishing" | "ironing" | "complete" | "delivered"
       unit_enum: "metres" | "pieces"
       expense_type_enum: "capex" | "opex"
       expense_category_enum: "salary" | "electricity" | "grocery" | "maintenance" | "transport" | "advertisement" | "miscellaneous"

@@ -1,15 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Package, ArrowLeft, Info } from 'lucide-react'
+import { Package, ArrowLeft, Info, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 
-const CUSTOM_CODE_REGEX = /^[A-Z]+-\d+$/
-const CUSTOM_CODE_ERROR = 'Custom code must follow CAPITALLETTERS-NUMBERS, e.g. DRESS-001.'
+const CUSTOM_CODE_REGEX = /^[a-zA-Z]{6}-\d{3}$/
+const CUSTOM_CODE_ERROR = 'Custom code must follow: 6 alphabets hyphen 3 digits, e.g. adchfg-001.'
 
 export default function AddInventoryPage() {
   const router = useRouter()
@@ -22,6 +22,28 @@ export default function AddInventoryPage() {
   const [currentQuantity, setCurrentQuantity] = useState<number | ''>('')
   const [sellingPrice, setSellingPrice] = useState<number | ''>('')
   const [costPrice, setCostPrice] = useState<number | ''>('')
+  
+  const [hint, setHint] = useState<string | null>(null)
+
+  // Listen to custom code prefix
+  useEffect(() => {
+    const cleaned = customCode.trim()
+    if (cleaned.length === 6 && /^[a-zA-Z]+$/.test(cleaned)) {
+      fetch(`/api/inventory?prefix=${cleaned}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.next_code) {
+            setCustomCode(data.next_code)
+            if (data.last_code) {
+              setHint(`Last used code for prefix "${cleaned}": ${data.last_code}`)
+            } else {
+              setHint(`First code for prefix "${cleaned}".`)
+            }
+          }
+        })
+        .catch(err => console.error(err))
+    }
+  }, [customCode])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -89,22 +111,30 @@ export default function AddInventoryPage() {
 
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <Input 
-                label="Custom Code" 
-                placeholder="e.g. DRESS-001"
-                value={customCode}
-                onChange={(e) => {
-                  const nextValue = e.target.value
-                  setCustomCode(nextValue)
-                  setCustomCodeError(
-                    nextValue.trim() && !CUSTOM_CODE_REGEX.test(nextValue.trim())
-                      ? CUSTOM_CODE_ERROR
-                      : null
-                  )
-                }}
-                error={customCodeError || undefined}
-                required
-              />
+              <div>
+                <Input 
+                  label="Custom Code" 
+                  placeholder="e.g. adchfg (will auto-suffix)"
+                  value={customCode}
+                  onChange={(e) => {
+                    const nextValue = e.target.value
+                    setCustomCode(nextValue)
+                    setCustomCodeError(
+                      nextValue.trim() && !CUSTOM_CODE_REGEX.test(nextValue.trim()) && nextValue.trim().length !== 6
+                        ? CUSTOM_CODE_ERROR
+                        : null
+                    )
+                  }}
+                  error={customCodeError || undefined}
+                  required
+                />
+                {hint && (
+                  <p className="text-xs text-boutique-indigo mt-1 flex items-center gap-1">
+                    <HelpCircle className="w-3.5 h-3.5" />
+                    {hint}
+                  </p>
+                )}
+              </div>
               <Input 
                 label="Item Name" 
                 placeholder="Georgette Anarkali Suit"
@@ -168,3 +198,4 @@ export default function AddInventoryPage() {
     </div>
   )
 }
+

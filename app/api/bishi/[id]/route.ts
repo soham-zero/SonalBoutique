@@ -13,7 +13,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
       *,
       bishi_members (*)
     `)
-    .eq('id', Number(params.id))
+    .eq('id', params.id)
     .single()
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 
 type InventoryItem = {
-  id: number
+  id: string
   name: string
   custom_code: string
   unit: string
@@ -18,12 +18,12 @@ type InventoryItem = {
 }
 
 type LedgerEntry = {
-  id: number
+  id: string
   action: string
   quantity: number
   cost_price: number | null
   notes: string | null
-  created_at: string
+  date_time: string
 }
 
 // ─── Action Modal ────────────────────────────────────────────────────────────
@@ -55,9 +55,9 @@ function ActionModal({
       const body: Record<string, unknown> = { action, quantity: Number(qty), notes }
       if (isRestock) body.cost_price = Number(costPrice) || 0
       const res = await fetch(`/api/jobwork/inventory/${item.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+         method: 'POST',
+         headers: { 'Content-Type': 'application/json' },
+         body: JSON.stringify(body),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -73,10 +73,10 @@ function ActionModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-card-hover border border-boutique-border w-full max-w-md animate-modal-in">
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-lg border border-boutique-border w-full max-w-md overflow-hidden animate-modal-in">
         {/* Header */}
-        <div className={`px-6 py-4 rounded-t-2xl flex items-center justify-between ${
+        <div className={`px-6 py-4 flex items-center justify-between ${
           isRestock
             ? 'bg-boutique-emeraldLight border-b border-emerald-200'
             : 'bg-boutique-rubyLight border-b border-red-200'
@@ -110,7 +110,7 @@ function ActionModal({
             <Input
               label={`Quantity (${item.unit})`}
               type="number"
-              min={1}
+              min={0.01}
               step="0.01"
               placeholder="0"
               value={qty}
@@ -135,7 +135,7 @@ function ActionModal({
             <textarea
               value={notes}
               onChange={e => setNotes(e.target.value)}
-              placeholder={isRestock ? 'e.g. Purchased from Textiles Hub' : 'e.g. Used for job #42'}
+              placeholder={isRestock ? 'e.g. Purchased from Textiles Hub' : 'e.g. Used for stitching'}
               rows={2}
               className="w-full rounded-lg border border-boutique-border bg-boutique-cream/50 px-3 py-2 text-sm text-boutique-charcoal focus:outline-none focus:ring-2 focus:ring-boutique-roseDark/30 resize-none"
             />
@@ -167,7 +167,7 @@ function ActionModal({
 }
 
 // ─── Ledger Row ───────────────────────────────────────────────────────────────
-function LedgerRow({ itemId }: { itemId: number }) {
+function LedgerRow({ itemId }: { itemId: string }) {
   const [open, setOpen] = useState(false)
   const [entries, setEntries] = useState<LedgerEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -213,7 +213,7 @@ function LedgerRow({ itemId }: { itemId: number }) {
               )}
               {e.notes && <span className="text-boutique-charcoalLight truncate">{e.notes}</span>}
               <span className="ml-auto text-boutique-charcoalLight whitespace-nowrap">
-                {format(new Date(e.created_at), 'dd MMM, h:mm a')}
+                {format(new Date(e.date_time), 'dd MMM, h:mm a')}
               </span>
             </div>
           ))}

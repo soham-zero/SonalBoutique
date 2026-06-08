@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-
 import { Database } from '@/types/database.types'
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
@@ -12,7 +11,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
   const { data, error } = await supabase
     .from('bishi_members')
     .select('*')
-    .eq('bishi_id', Number(params.id))
+    .eq('bishi_id', params.id)
     .order('name')
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -31,19 +30,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const payload: Database['public']['Tables']['bishi_members']['Insert'] = {
-      bishi_id: Number(params.id),
+    const payload = {
+      bishi_id: params.id,
       name,
       phone,
       joined_at: joined_at ? new Date(joined_at).toISOString() : new Date().toISOString()
     }
 
-    const { data, error } = await supabase.from('bishi_members').insert(payload as any).select().single()
+    const { data, error } = await (supabase.from('bishi_members') as any).insert(payload).select().single()
 
     if (error) throw new Error(error.message)
-
-    // Increment bishi total_members visually? Schema doesn't enforce total_members sync.
-    // Assuming total_members is just a static limit or label. We will stick to schema.
 
     return NextResponse.json({ success: true, member: data })
   } catch (err: any) {

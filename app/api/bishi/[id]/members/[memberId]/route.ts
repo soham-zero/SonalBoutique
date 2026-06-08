@@ -12,9 +12,9 @@ export async function GET(request: Request, { params }: { params: { id: string, 
       *,
       bishi (*),
       bishi_ledger (*),
-      bishi_sales (*, transactions (transaction_number))
+      bishi_sales (*, transactions (bill_number))
     `)
-    .eq('id', Number(params.memberId))
+    .eq('id', params.memberId)
     .single()
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

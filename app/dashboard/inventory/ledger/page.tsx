@@ -9,12 +9,13 @@ import { ArrowLeft, ArrowUpCircle, ArrowDownCircle, Search, Filter, X } from 'lu
 import Link from 'next/link'
 
 type LedgerEntry = {
-  id: number
+  id: string
   quantity_added: number
   cost_price: number
   date_time: string
-  inventory: { id: number; name: string; custom_code: string }
+  inventory: { id: string; name: string; custom_code: string }
 }
+
 
 export default function InventoryLedgerPage() {
   const [entries, setEntries] = useState<LedgerEntry[]>([])

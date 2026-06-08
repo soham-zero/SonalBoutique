@@ -6,17 +6,15 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { format } from 'date-fns'
-import { Edit2, Save, X } from 'lucide-react'
+import { Edit2, Save, X, ArrowLeft, ArrowUpRight, ArrowDownLeft } from 'lucide-react'
+import Link from 'next/link'
 
 export default function InventoryDetail({ params }: { params: { id: string } }) {
   const router = useRouter()
   const [item, setItem] = useState<any>(null)
+  const [timeline, setTimeline] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [ledgerLoadingMore, setLedgerLoadingMore] = useState(false)
-  const [ledgerHasMore, setLedgerHasMore] = useState(false)
-  const [ledgerOffset, setLedgerOffset] = useState(0)
-  const LEDGER_LIMIT = 10
 
   // Editing Price State
   const [isEditingPrice, setIsEditingPrice] = useState(false)
@@ -28,27 +26,13 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
   const [restockCost, setRestockCost] = useState<number | ''>('')
   const [restocking, setRestocking] = useState(false)
 
-  const loadItem = async (isLedgerLoadMore = false) => {
-    if (isLedgerLoadMore) setLedgerLoadingMore(true)
+  const loadItem = async () => {
     try {
-      const currentLedgerOffset = isLedgerLoadMore ? ledgerOffset + LEDGER_LIMIT : 0
-      const res = await fetch(`/api/inventory/${params.id}?ledger_limit=${LEDGER_LIMIT}&ledger_offset=${currentLedgerOffset}`)
+      const res = await fetch(`/api/inventory/${params.id}`)
       const data = await res.json()
       if (res.ok) {
-        if (isLedgerLoadMore) {
-          setItem((prev: any) => ({
-            ...data.item,
-            inventory_ledger: [
-              ...(prev?.inventory_ledger || []),
-              ...(data.item?.inventory_ledger || [])
-            ]
-          }))
-          setLedgerOffset(currentLedgerOffset)
-        } else {
-          setItem(data.item)
-          setLedgerOffset(0)
-        }
-        setLedgerHasMore(Boolean(data.ledger_has_more))
+        setItem(data.item)
+        setTimeline(data.timeline || [])
         setEditPriceVal(data.item.selling_price)
       } else {
         setError(data.error)
@@ -57,7 +41,6 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
       setError(e.message)
     } finally {
        setLoading(false)
-       setLedgerLoadingMore(false)
     }
   }
 
@@ -120,6 +103,15 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto pb-20">
+      <div className="flex items-center gap-3">
+        <Link href="/dashboard/inventory">
+          <Button variant="ghost" size="sm" className="gap-1.5">
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        </Link>
+      </div>
+
       <PageHeader 
         title={item.name} 
         description={`Code: ${item.custom_code}`} 
@@ -175,7 +167,7 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
                    </Button>
                 </div>
               ) : (
-                <p className="text-3xl font-medium text-boutique-charcoal tracking-tight">₹{item.selling_price.toFixed(2)}</p>
+                <p className="text-3xl font-medium text-boutique-charcoal tracking-tight">₹{Number(item.selling_price).toFixed(2)}</p>
               )}
            </div>
         </div>
@@ -207,69 +199,70 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
              </div>
              <Button type="submit" className="w-full mt-2" disabled={restocking}>
                 {restocking ? 'Processing...' : 'Add Stock'}
-             </Button>
+              </Button>
            </form>
         </div>
       </div>
 
-      {/* HISTORY TABLE */}
+      {/* TIMELINE TABLE */}
       <div className="bg-white rounded-xl shadow-soft border border-boutique-border overflow-hidden">
         <div className="p-4 border-b border-boutique-border bg-gray-50">
-          <h3 className="font-serif font-bold text-lg text-boutique-charcoal">Inventory Ledger Timeline</h3>
+          <h3 className="font-serif font-bold text-lg text-boutique-charcoal">Stock History Timeline</h3>
         </div>
         <div className="overflow-x-auto">
-          {item.inventory_ledger?.length === 0 ? (
-             <div className="p-8 text-center text-gray-700">No ledger entries found.</div>
+          {timeline.length === 0 ? (
+             <div className="p-8 text-center text-gray-700">No stock history entries found.</div>
           ) : (
-            <>
             <table className="w-full text-left text-sm">
               <thead className="text-boutique-charcoal font-medium border-b border-gray-200 bg-white">
                 <tr>
                   <th className="px-6 py-4">Date & Time</th>
-                  <th className="px-6 py-4">Action</th>
-                  <th className="px-6 py-4 text-right">Cost Price / Unit</th>
+                  <th className="px-6 py-4">Activity</th>
+                  <th className="px-6 py-4">Quantity Change</th>
+                  <th className="px-6 py-4 text-right">Price / Unit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                 {item.inventory_ledger.map((ledger: any) => {
-                   const isAddition = ledger.quantity_added > 0
+                 {timeline.map((entry) => {
+                   const isRestock = entry.type === 'restock'
                    return (
-                     <tr key={ledger.id} className="hover:bg-gray-50">
+                     <tr key={entry.id} className="hover:bg-gray-50">
                        <td className="px-6 py-4 text-gray-600">
-                         {format(new Date(ledger.date_time), 'PPp')}
+                         {format(new Date(entry.date_time), 'PPp')}
                        </td>
                        <td className="px-6 py-4">
-                         {isAddition ? (
-                           <span className="inline-flex items-center text-green-700 bg-green-50 px-2 py-1 rounded text-xs font-semibold">
-                             +{ledger.quantity_added} Added
-                           </span>
-                         ) : (
-                            <span className="inline-flex items-center text-boutique-charcoalLight bg-gray-100 px-2 py-1 rounded text-xs font-semibold">
-                             {ledger.quantity_added} Consumed
-                           </span>
-                         )}
+                         <div className="flex items-center gap-1.5 font-medium text-boutique-charcoal">
+                           {isRestock ? (
+                             <>
+                               <ArrowUpRight className="w-4 h-4 text-green-600" />
+                               <span>Restock Inflow</span>
+                             </>
+                           ) : (
+                             <>
+                               <ArrowDownLeft className="w-4 h-4 text-boutique-ruby" />
+                               <span>Sale Outflow</span>
+                             </>
+                           )}
+                         </div>
+                         <p className="text-xs text-boutique-charcoalLight mt-0.5">{entry.notes}</p>
+                       </td>
+                       <td className="px-6 py-4">
+                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                           isRestock 
+                             ? 'text-green-700 bg-green-50' 
+                             : 'text-red-700 bg-red-50'
+                         }`}>
+                           {isRestock ? `+${entry.quantity}` : `${entry.quantity}`}
+                         </span>
                        </td>
                        <td className="px-6 py-4 text-right font-medium">
-                          {isAddition ? `₹${ledger.cost_price.toFixed(2)}` : 'N/A'}
+                         ₹{Number(entry.price).toFixed(2)}
                        </td>
                      </tr>
                    )
                  })}
               </tbody>
             </table>
-            {ledgerHasMore && (
-              <div className="p-6 text-center border-t border-boutique-border bg-gray-50/50">
-                <Button
-                  variant="outline"
-                  onClick={() => loadItem(true)}
-                  disabled={ledgerLoadingMore}
-                  className="min-w-[150px]"
-                >
-                  {ledgerLoadingMore ? 'Loading More...' : 'Load More'}
-                </Button>
-              </div>
-            )}
-            </>
           )}
         </div>
       </div>
@@ -277,3 +270,4 @@ export default function InventoryDetail({ params }: { params: { id: string } }) 
     </div>
   )
 }
+

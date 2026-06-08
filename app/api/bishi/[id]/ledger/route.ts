@@ -7,11 +7,12 @@ export async function GET(request: Request, { params }: { params: { id: string }
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const bishiId = Number(params.id)
+    const bishiId = params.id
     const { searchParams } = new URL(request.url)
     const memberId = searchParams.get('member_id')
 
-    let query = (supabase.from('bishi_ledger') as any)
+    let query = supabase
+      .from('bishi_ledger')
       .select(`
         *,
         bishi_members (
@@ -20,10 +21,10 @@ export async function GET(request: Request, { params }: { params: { id: string }
         )
       `)
       .eq('bishi_id', bishiId)
-      .order('created_at', { ascending: false })
+      .order('date_time', { ascending: false })
 
     if (memberId) {
-      query = query.eq('bishi_member_id', Number(memberId))
+      query = query.eq('bishi_member_id', memberId)
     }
 
     const { data, error } = await query

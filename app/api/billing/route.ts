@@ -11,183 +11,121 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let dbQuery = (supabase
-    .from('transactions') as any)
-    .select('*')
+  let dbQuery = supabase
+    .from('transactions')
+    .select('*, customers(name, phone)')
     .order('date_time', { ascending: false })
-    .range(offset, offset + limit - 1)
 
   if (query) {
-    const isNumber = !isNaN(Number(query))
-    if (isNumber) {
-      dbQuery = dbQuery.or(`customer_phone.ilike.%${query}%,transaction_number.eq.${query}`)
+    // 1. Find matching customer IDs
+    const { data: matchingCustomers } = await supabase
+      .from('customers')
+      .select('id')
+      .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+
+    const customerIds = ((matchingCustomers || []) as any[]).map((c: any) => c.id)
+
+    if (customerIds.length > 0) {
+      dbQuery = dbQuery.or(`bill_number.ilike.%${query}%,customer_id.in.(${customerIds.map(id => `"${id}"`).join(',')})`)
     } else {
-      dbQuery = dbQuery.or(`customer_name.ilike.%${query}%`)
+      dbQuery = dbQuery.ilike('bill_number', `%${query}%`)
     }
   }
 
-  const { data, error } = await dbQuery
+  const { data, error } = await dbQuery.range(offset, offset + limit - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ transactions: data })
+  // Map to historical structure to avoid breaking frontends
+  const transactions = (data || []).map((tx: any) => ({
+    id: tx.id,
+    transaction_number: tx.bill_number,
+    customer_name: tx.customers?.name || null,
+    customer_phone: tx.customers?.phone || null,
+    payment_mode: tx.payment_mode,
+    total_amount: Number(tx.total_amount),
+    amount_paid: Number(tx.amount_paid),
+    date_time: tx.date_time
+  }))
+
+  return NextResponse.json({ transactions })
 }
 
 export async function POST(request: Request) {
   try {
     const payload = await request.json()
-    const adminClient = createAdminClient() // use service role to execute
+    const adminClient = createAdminClient()
     
-    // Deconstruct payload
     const {
-      bill_items = [], // { inventory_id, quantity, discount }[]
-      job_items = [],  // { charge, cloth_provided_by, due_date }[]
+      bill_items = [], // { inventory_id, quantity, is_bishi }[]
+      job_items = [],  // { name, description, charge, cloth_provided_by, due_date }[]
       payment_mode,
       amount_paid,
       customer_name,
       customer_phone,
       bishi_id,
       bishi_member_id,
-      bill_date_time
+      bill_date_time,
+      bill_number: manualBillNumber
     } = payload
 
     if (!bill_items.length && !job_items.length) {
       return NextResponse.json({ error: 'Must provide at least one bill item or job item.' }, { status: 400 })
     }
 
-    let billDateTime: string | undefined
+    let billDateTime = new Date().toISOString()
     if (bill_date_time) {
       const parsedBillDate = new Date(bill_date_time)
       if (Number.isNaN(parsedBillDate.getTime())) {
         return NextResponse.json({ error: 'Invalid bill date and time.' }, { status: 400 })
       }
-
-      if (parsedBillDate.getTime() > Date.now()) {
-        return NextResponse.json({ error: 'Bill date and time cannot be in the future.' }, { status: 400 })
-      }
-
       billDateTime = parsedBillDate.toISOString()
     }
 
-    // Step 1: Pre-calculate bill items
-    let total_amount = 0
-    let discount_amount = 0
-    
-    const enriched_bill_items = []
-    for (const item of bill_items) {
-      const { data: inv, error: invError } = await (adminClient
-        .from('inventory') as any)
-        .select('selling_price, current_quantity')
-        .eq('id', item.inventory_id)
-        .single()
-      
-      if (invError || !inv) throw new Error(`Inventory item ${item.inventory_id} not found`)
-      
-      const p = Number(inv.selling_price)
-      const q = Number(item.quantity)
-      const d = Number(item.discount || 0)
-      const amt = (q * p) - d
+    // Step 1: Determine Bill Number
+    let billNumber = manualBillNumber
+    if (!billNumber) {
+      const { data: latestTx, error: latestErr } = await adminClient
+        .from('transactions')
+        .select('bill_number')
+        .order('bill_number', { ascending: false })
+        .limit(100) // retrieve a decent sample to find true max
 
-      total_amount += amt
-      discount_amount += d
-
-      enriched_bill_items.push({
-        inventory_id: item.inventory_id,
-        quantity: q,
-        price_sold_at: p,
-        discount: d,
-        amount: amt,
-        current_quantity: inv.current_quantity
-      })
-    }
-
-    // Add job charges to total
-    for (const job of job_items) {
-      total_amount += Number(job.charge)
-    }
-
-    // Step 2: Create Transaction
-    const { data: transaction, error: txError } = await (adminClient
-      .from('transactions') as any)
-      .insert({
-        customer_name: customer_name || null,
-        customer_phone: customer_phone || null,
-        payment_mode,
-        total_amount,
-        discount_amount,
-        amount_paid,
-        ...(billDateTime ? { date_time: billDateTime } : {})
-      })
-      .select('id, transaction_number')
-      .single()
-
-    if (txError) throw new Error('Failed to create transaction: ' + txError.message)
-
-    const txId = transaction.id
-
-    // Step 3: Insert Bill Items & update inventory sequentially
-    for (const item of enriched_bill_items) {
-      // insert bill_item
-      await (adminClient.from('bill_items') as any).insert({
-        transaction_id: txId,
-        inventory_id: item.inventory_id,
-        quantity: item.quantity,
-        price_sold_at: item.price_sold_at,
-        discount: item.discount,
-        amount: item.amount
-      })
-
-      // debit inventory
-      const newQty = item.current_quantity - item.quantity
-      await (adminClient.from('inventory') as any).update({ current_quantity: newQty }).eq('id', item.inventory_id)
-
-      // inventory ledger (negative qty means consumed/sold)
-      await (adminClient.from('inventory_ledger') as any).insert({
-        inventory_id: item.inventory_id,
-        quantity_added: -item.quantity,
-        cost_price: item.price_sold_at, // using selling price for sold record reference as cost_price
-        ...(billDateTime ? { date_time: billDateTime } : {})
-      })
-    }
-
-    // Step 4: Insert Job Items
-    for (const job of job_items) {
-      const { data: jobData, error: jobErr } = await (adminClient.from('job_items') as any).insert({
-        transaction_id: txId,
-        charge: job.charge,
-        cloth_provided_by: job.cloth_provided_by,
-        due_date: job.due_date || null,
-        status: 'ordered'
-      }).select().single()
-
-      if (!jobErr && jobData) {
-        await (adminClient.from('job_item_ledger') as any).insert({
-          job_item_id: jobData.id,
-          employee_name: 'System', // First entry
-          work: 'ordered',
-          ...(billDateTime ? { changed_at: billDateTime } : {})
+      let maxNum = 0
+      if (latestTx && latestTx.length > 0) {
+        latestTx.forEach((tx: any) => {
+          const num = parseInt(tx.bill_number, 10)
+          if (!isNaN(num) && num > maxNum) {
+            maxNum = num
+          }
         })
       }
+      billNumber = String(maxNum + 1)
     }
 
-    // Step 5: Customer Balance handling if due exists
-    const finalAmountPaid = Number(amount_paid)
-    // The instructions: amount_paid < total_amount => due exists
-    // actually, discount is already removed from total_amount.
-    // Let's ensure logic: due = total_amount - amount_paid
-    const due = total_amount - finalAmountPaid
+    // Step 2: Customer creation / upsert
+    let customerId = null
+    if (customer_phone) {
+      const { data: existingCustData } = await adminClient
+        .from('customers')
+        .select('*')
+        .eq('phone', customer_phone)
+        .single()
+      const existingCust = existingCustData as any
 
-    if (due > 0 && customer_phone) {
-      // Find or create customer
-      let customerId
-      const { data: existingCust } = await (adminClient.from('customers') as any).select('*').eq('phone', customer_phone).single()
-      
+      const billTotalAmount = bill_items.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.price_sold_at || 0) - Number(item.discount || 0)), 0)
+        + job_items.reduce((acc: number, item: any) => acc + Number(item.charge || 0), 0)
+
+      const discountVal = Number(payload.discount_amount || 0)
+      const finalTotal = billTotalAmount - discountVal
+      const due = finalTotal - Number(amount_paid)
+
       if (existingCust) {
         customerId = existingCust.id
-        const newBilled = Number(existingCust.total_billed) + total_amount
-        const newPaid = Number(existingCust.total_paid) + finalAmountPaid
+        const newBilled = Number(existingCust.total_billed) + finalTotal
+        const newPaid = Number(existingCust.total_paid) + Number(amount_paid)
         const newBalance = Number(existingCust.balance) + due
         await (adminClient.from('customers') as any).update({
-          name: customer_name || existingCust.name, // update name if provided
+          name: customer_name || existingCust.name,
           total_billed: newBilled,
           total_paid: newPaid,
           balance: newBalance
@@ -196,46 +134,145 @@ export async function POST(request: Request) {
         const { data: newCust, error: custErr } = await (adminClient.from('customers') as any).insert({
           name: customer_name || 'Walk-in',
           phone: customer_phone,
-          total_billed: total_amount,
-          total_paid: finalAmountPaid,
+          total_billed: finalTotal,
+          total_paid: Number(amount_paid),
           balance: due
         }).select().single()
 
         if (custErr) throw new Error('Customer creation err: ' + custErr.message)
-        customerId = newCust.id
+        customerId = (newCust as any).id
       }
+    }
 
-      // Customer Balance Ledger
-      await (adminClient.from('customer_balance_ledger') as any).insert({
-        customer_id: customerId,
-        transaction_id: txId,
-        amount_billed: total_amount,
-        amount_paid: finalAmountPaid,
-        due: due,
-        ...(billDateTime ? { date_time: billDateTime } : {})
+    // Step 3: Pre-calculate bill items
+    let total_amount = 0
+    let discount_amount = Number(payload.discount_amount || 0)
+    
+    const enriched_bill_items = []
+    for (const item of bill_items) {
+      const { data: invData, error: invError } = await adminClient
+        .from('inventory')
+        .select('selling_price, current_quantity')
+        .eq('id', item.inventory_id)
+        .single()
+      const inv = invData as any
+      
+      if (invError || !inv) throw new Error(`Inventory item ${item.inventory_id} not found`)
+      
+      const p = Number(item.price_sold_at || inv.selling_price)
+      const q = Number(item.quantity)
+      const amt = q * p
+
+      total_amount += amt
+
+      enriched_bill_items.push({
+        inventory_id: item.inventory_id,
+        quantity: q,
+        price_sold_at: p,
+        amount: amt,
+        current_quantity: inv.current_quantity,
+        is_bishi: item.is_bishi
       })
     }
 
-    // Step 6: Bishi handling
+    // Add job charges to total
+    for (const job of job_items) {
+      total_amount += Number(job.charge)
+    }
+
+    const finalNetTotal = total_amount - discount_amount
+
+    // Step 4: Create Transaction
+    const { data: transaction, error: txError } = await (adminClient
+      .from('transactions') as any)
+      .insert({
+        bill_number: billNumber,
+        customer_id: customerId,
+        payment_mode,
+        total_amount: finalNetTotal,
+        discount_amount,
+        amount_paid: Number(amount_paid),
+        date_time: billDateTime
+      })
+      .select('id')
+      .single()
+
+    if (txError) throw new Error('Failed to create transaction: ' + txError.message)
+
+    const txId = (transaction as any).id
+
+    // Step 5: Insert Bill Items & update inventory sequentially
+    for (const item of enriched_bill_items) {
+      const { data: biData, error: biErr } = await (adminClient
+        .from('bill_items') as any)
+        .insert({
+          transaction_id: txId,
+          inventory_id: item.inventory_id,
+          quantity: item.quantity,
+          price_sold_at: item.price_sold_at,
+          amount: item.amount
+        })
+        .select()
+        .single()
+
+      if (biErr) throw new Error("Failed to insert bill item: " + biErr.message)
+
+      // Debit inventory
+      const newQty = item.current_quantity - item.quantity
+      await (adminClient.from('inventory') as any).update({ current_quantity: newQty }).eq('id', item.inventory_id)
+
+      // Inventory ledger
+      await (adminClient.from('inventory_ledger') as any).insert({
+        inventory_id: item.inventory_id,
+        quantity_added: -item.quantity,
+        cost_price: item.price_sold_at,
+        date_time: billDateTime
+      })
+
+      // Bishi check for bill items
+      if (item.is_bishi && bishi_id && bishi_member_id) {
+        await (adminClient.from('bishi_bill_items') as any).insert({
+          bill_item_id: (biData as any).id,
+          bishi_id,
+          bishi_member_id
+        })
+      }
+    }
+
+    // Step 6: Insert Job Items
+    for (const job of job_items) {
+      const { error: jobErr } = await (adminClient.from('job_items') as any).insert({
+        transaction_id: txId,
+        name: job.name,
+        description: job.description || null,
+        charge: job.charge,
+        cloth_provided_by: job.cloth_provided_by,
+        due_date: job.due_date || null,
+        status: 'ordered'
+      })
+
+      if (jobErr) throw new Error('Failed to create job item: ' + jobErr.message)
+    }
+
+    // Step 7: Bishi Sales records
     if (bishi_id && bishi_member_id && discount_amount > 0) {
-      // Record Bishi Sale
       await (adminClient.from('bishi_sales') as any).insert({
         transaction_id: txId,
-        bishi_id: Number(bishi_id),
-        bishi_member_id: Number(bishi_member_id),
+        bishi_id,
+        bishi_member_id,
         redeemed: discount_amount,
-        ...(billDateTime ? { date_time: billDateTime } : {})
+        date_time: billDateTime
       })
 
       // Update Member
-      const { data: member } = await (adminClient.from('bishi_members') as any).select('total_redeemed, balance').eq('id', bishi_member_id).single()
-      if (member) {
-        const updatedRedeemed = Number(member.total_redeemed) + discount_amount
-        const updatedBalance = Number(member.balance) - discount_amount
+      const { data: member } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', bishi_member_id).single()
+      const memberData = member as any
+      if (memberData) {
+        const updatedRedeemed = Number(memberData.total_redeemed) + discount_amount
+        const updatedBalance = Number(memberData.balance) - discount_amount
         await (adminClient.from('bishi_members') as any).update({
           total_redeemed: updatedRedeemed,
-          balance: updatedBalance,
-          last_updated: billDateTime || new Date().toISOString()
+          balance: updatedBalance
         }).eq('id', bishi_member_id)
       }
     }

@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { Plus, Search, Eye, AlertTriangle, BookOpen } from 'lucide-react'
 
-type InventoryItem = { id: number; name: string; custom_code: string; selling_price: number; current_quantity: number }
+type InventoryItem = { id: string; name: string; custom_code: string; selling_price: number; current_quantity: number }
+
 
 export default function InventoryPage() {
   const [items, setItems] = useState<InventoryItem[]>([])

@@ -6,7 +6,8 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { format } from 'date-fns'
 import clsx from 'clsx'
-import { Check, Clock } from 'lucide-react'
+import { Check, Clock, ArrowLeft } from 'lucide-react'
+import Link from 'next/link'
 
 const STAGE_ORDER = [
   'ordered',
@@ -15,25 +16,33 @@ const STAGE_ORDER = [
   'stitching',
   'finishing',
   'ironing',
-  'complete'
+  'complete',
+  'delivered'
 ]
 
 type JobData = {
-  id: number;
+  id: string;
+  name: string;
+  description: string | null;
   status: string;
   charge: number;
-  due_date: string;
+  due_date: string | null;
   cloth_provided_by: string;
-  transactions?: { transaction_number: string };
+  transactions?: { 
+    id: string; 
+    bill_number: string;
+    customers?: { name: string; phone: string } | null;
+  } | null;
   job_item_ledger: Array<{
-    id: number;
-    employee_name: string;
+    id: string;
+    employee_id: string;
     work: string;
     changed_at: string;
+    employees?: { name: string } | null;
   }>
 }
 
-type Employee = { id: number; name: string }
+type Employee = { id: string; name: string }
 
 export default function JobWorkDetail({ params }: { params: { id: string } }) {
   const router = useRouter()
@@ -46,8 +55,19 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
   const [updating, setUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const fetchJobDetails = async () => {
+    try {
+      const res = await fetch(`/api/billing/jobwork/${params.id}`)
+      if (res.ok) {
+        const jobData = await res.json()
+        setJob(jobData.job)
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
+
   useEffect(() => {
-    // Parallel fetch job details and employees
     Promise.all([
       fetch(`/api/billing/jobwork/${params.id}`).then(res => res.json()),
       fetch(`/api/employees`).then(res => res.json())
@@ -76,16 +96,14 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
 
     setUpdating(true)
     setError(null)
-    const empData = employees.find(e => e.id === Number(selectedEmployee))
 
     try {
-      const res = await fetch(`/api/billing/jobwork/${job.id}/status`, {
+      const res = await fetch(`/api/billing/jobwork/${job.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           next_status: nextStage,
-          employee_id: empData?.id,
-          employee_name: empData?.name
+          employee_id: selectedEmployee
         })
       })
 
@@ -94,9 +112,7 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
         throw new Error(errorData.error || 'Failed to update status')
       }
 
-      // Refresh data
-      const freshJob = await fetch(`/api/billing/jobwork/${params.id}`).then(r => r.json())
-      setJob(freshJob.job)
+      await fetchJobDetails()
       setSelectedEmployee('')
     } catch (e: any) {
       setError(e.message)
@@ -107,12 +123,28 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20">
+      <div className="flex items-center gap-3">
+        <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => router.back()}>
+          <ArrowLeft className="w-4 h-4" />
+          Back
+        </Button>
+      </div>
+
       <PageHeader 
-        title={`Job Work #JOB-${job.id}`} 
-        description={`Transaction Reference: #${job.transactions?.transaction_number || 'None'}`} 
+        title={`Job Work: ${job.name}`} 
+        description={`Bill Reference: #${job.transactions?.bill_number || 'N/A'}`} 
       />
 
-      <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div>
+           <h3 className="text-sm font-medium text-boutique-charcoalLight mb-1">Customer</h3>
+           <p className="font-semibold text-boutique-charcoal">
+             {job.transactions?.customers?.name || 'Walk-in Customer'}
+           </p>
+           {job.transactions?.customers?.phone && (
+             <p className="text-xs text-boutique-charcoalLight">{job.transactions.customers.phone}</p>
+           )}
+        </div>
         <div>
            <h3 className="text-sm font-medium text-boutique-charcoalLight mb-1">Due Date</h3>
            <p className="font-semibold text-lg text-boutique-charcoal">
@@ -133,10 +165,17 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
         </div>
       </div>
 
+      {job.description && (
+        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6">
+          <h3 className="text-sm font-medium text-boutique-charcoalLight mb-2">Description / Notes</h3>
+          <p className="text-sm text-boutique-charcoal whitespace-pre-line">{job.description}</p>
+        </div>
+      )}
+
       {/* Stage Progression UI */}
       <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 overflow-x-auto">
         <h3 className="font-serif font-bold text-lg text-boutique-charcoal mb-6">Progression Track</h3>
-        <div className="flex items-center justify-between min-w-[600px] relative">
+        <div className="flex items-center justify-between min-w-[700px] relative">
           <div className="absolute top-1/2 left-0 right-0 h-1 bg-gray-200 -translate-y-1/2 z-0 hidden md:block" />
           {STAGE_ORDER.map((stage, idx) => {
             const isCompleted = idx <= currentStageIndex
@@ -205,7 +244,7 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
             </div>
           ) : (
              <div className="p-4 bg-green-50 rounded border border-green-200 text-green-700 font-medium">
-               This job has reached the &quot;Complete&quot; stage. No further progression allowed.
+               This job has been fully delivered.
              </div>
           )}
         </div>
@@ -213,19 +252,19 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
         {/* Ledger History */}
         <div className="bg-white rounded-xl shadow-soft border border-boutique-border overflow-hidden">
            <div className="bg-gray-50 border-b border-gray-200 p-4">
-             <h3 className="font-serif font-bold text-lg text-boutique-charcoal">History Log</h3>
+              <h3 className="font-serif font-bold text-lg text-boutique-charcoal">History Log</h3>
            </div>
            {job.job_item_ledger && job.job_item_ledger.length > 0 ? (
              <div className="p-6 relative space-y-6">
-                <div className="absolute left-7 top-6 bottom-6 w-0.5 bg-gray-200"></div>
+                <div className="absolute left-7 top-6 bottom-6 w-0.5 bg-gray-200 animate-slide-down"></div>
                 {job.job_item_ledger.map((ledger) => (
                   <div key={ledger.id} className="relative z-10 flex gap-4">
-                     <div className="w-6 h-6 rounded-full bg-boutique-roseLight flex items-center justify-center shrink-0 border border-white shrink-0 shadow-sm text-white relative right-1">
+                     <div className="w-6 h-6 rounded-full bg-boutique-roseLight flex items-center justify-center shrink-0 border border-white shadow-sm text-white relative right-1">
                         <Check className="w-3 h-3 text-white" />
                      </div>
                      <div>
                        <p className="font-medium text-sm text-boutique-charcoal capitalize">Moved to {ledger.work}</p>
-                       <p className="text-xs text-boutique-charcoalLight mt-0.5">By {ledger.employee_name}</p>
+                       <p className="text-xs text-boutique-charcoalLight mt-0.5">By {ledger.employees?.name || 'Unknown'}</p>
                        <p className="text-xs text-gray-600 mt-0.5">{format(new Date(ledger.changed_at), 'MMM dd, h:mm a')}</p>
                      </div>
                   </div>

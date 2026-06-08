@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const q = searchParams.get('q') || ''
   const limit = Number(searchParams.get('limit')) || 10
   const offset = Number(searchParams.get('offset')) || 0
+  const onlyWithBalance = searchParams.get('onlyWithBalance') === 'true'
   
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -14,9 +15,13 @@ export async function GET(request: Request) {
   let query = supabase
     .from('customers')
     .select('id, name, phone, total_billed, total_paid, balance', { count: 'exact' })
-    .gt('balance', 0)
+    .order('balance', { ascending: false })
     .order('name', { ascending: true })
     .range(offset, offset + limit - 1)
+
+  if (onlyWithBalance) {
+    query = query.gt('balance', 0)
+  }
 
   if (q) {
      query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
@@ -27,3 +32,4 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ customers: data, count: count || 0 })
 }
+

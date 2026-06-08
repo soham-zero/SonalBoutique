@@ -9,7 +9,7 @@ import Link from 'next/link'
 import { format } from 'date-fns'
 
 type BishiMember = {
-  id: number
+  id: string
   name: string
   phone: string | null
   total_contributed: number
@@ -61,9 +61,9 @@ function ContributeModal({
   }
 
   return (
-    <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="bg-white rounded-2xl shadow-card-hover border border-boutique-border w-full max-w-sm animate-modal-in">
-        <div className="px-5 py-4 bg-boutique-emeraldLight/60 border-b border-emerald-200 rounded-t-2xl flex items-center justify-between">
+    <div className="fixed inset-0 bg-black/55 z-50 flex items-center justify-center p-4" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="bg-white rounded-2xl shadow-card-hover border border-boutique-border w-full max-w-sm overflow-hidden animate-modal-in">
+        <div className="px-5 py-4 bg-boutique-emeraldLight/60 border-b border-emerald-200 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ArrowUpCircle className="w-5 h-5 text-boutique-emerald text-emerald-600" />
             <div>
@@ -125,6 +125,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [mName, setMName] = useState('')
   const [mPhone, setMPhone] = useState('')
+  const [memberSearch, setMemberSearch] = useState('')
   
   const [contributeModal, setContributeModal] = useState<BishiMember | null>(null)
 
@@ -176,6 +177,11 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
 
   const totalPool = members.reduce((acc, m) => acc + Number(m.total_contributed), 0)
 
+  const filteredMembers = members.filter(m => 
+    m.name.toLowerCase().includes(memberSearch.toLowerCase()) || 
+    (m.phone && m.phone.includes(memberSearch))
+  )
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
       {contributeModal && (
@@ -206,7 +212,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
              <p className="text-xs font-semibold uppercase tracking-wider text-boutique-charcoalLight">Current Members</p>
              <p className="text-3xl font-bold text-boutique-charcoal mt-1 tracking-tight">{members.length}</p>
            </div>
-           <div className="w-12 h-12 bg-boutique-tealLight rounded-full flex items-center justify-center text-teal-800">
+           <div className="w-12 h-12 bg-boutique-indigoLight/20 rounded-full flex items-center justify-center text-boutique-indigo">
               <Users className="w-5 h-5" />
            </div>
         </div>
@@ -224,7 +230,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
           onClick={() => setActiveTab('members')}
           className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 flex gap-2 items-center ${
             activeTab === 'members' 
-              ? 'border-boutique-teal text-teal-800 bg-boutique-tealLight/30' 
+              ? 'border-boutique-roseDark text-boutique-roseDark font-bold bg-boutique-creamDark/20' 
               : 'border-transparent text-boutique-charcoalLight hover:text-boutique-charcoal'
           }`}
         >
@@ -235,7 +241,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
           onClick={() => setActiveTab('ledger')}
           className={`px-6 py-3 text-sm font-medium transition-colors border-b-2 flex gap-2 items-center ${
             activeTab === 'ledger' 
-              ? 'border-boutique-teal text-teal-800 bg-boutique-tealLight/30' 
+              ? 'border-boutique-roseDark text-boutique-roseDark font-bold bg-boutique-creamDark/20' 
               : 'border-transparent text-boutique-charcoalLight hover:text-boutique-charcoal'
           }`}
         >
@@ -248,25 +254,31 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
       {activeTab === 'members' && (
         <div className="animate-fade-in space-y-6">
           <div className="flex justify-between items-center bg-white p-4 rounded-2xl shadow-soft border border-boutique-border">
-            <div className="flex items-center gap-2">
-              <Search className="w-4 h-4 text-boutique-charcoalLight" />
-              <input type="text" placeholder="Filter members..." disabled className="bg-transparent text-sm focus:outline-none" />
+            <div className="flex items-center gap-2 max-w-xs w-full relative">
+              <Search className="w-4 h-4 text-boutique-charcoalLight absolute left-3 top-1/2 -translate-y-1/2" />
+              <Input 
+                type="text" 
+                placeholder="Filter members by name..." 
+                value={memberSearch}
+                onChange={e => setMemberSearch(e.target.value)}
+                className="pl-9 h-9" 
+              />
             </div>
-            <Button onClick={() => setIsAddingMember(!isAddingMember)} variant={isAddingMember ? 'outline' : 'info'} size="sm">
+            <Button onClick={() => setIsAddingMember(!isAddingMember)} variant={isAddingMember ? 'outline' : 'primary'} size="sm">
                {isAddingMember ? 'Cancel' : ( <><Plus className="w-4 h-4 mr-1.5" /> Add Member</> )}
             </Button>
           </div>
 
           {isAddingMember && (
-            <form onSubmit={handleAddMember} className="bg-white p-6 rounded-2xl border border-boutique-teal shadow-soft grid grid-cols-1 md:grid-cols-3 gap-4 items-end animate-slide-down">
+            <form onSubmit={handleAddMember} className="bg-white p-6 rounded-2xl border border-boutique-border shadow-soft grid grid-cols-1 md:grid-cols-3 gap-4 items-end animate-slide-down">
               <Input label="Member Name" value={mName} onChange={e => setMName(e.target.value)} required placeholder="Full Name" />
               <Input label="Phone Number" value={mPhone} onChange={e => setMPhone(e.target.value)} placeholder="+91..." />
-              <Button type="submit" variant="info">Register Member</Button>
+              <Button type="submit" variant="success">Register Member</Button>
             </form>
           )}
 
           <div className="bg-white rounded-2xl shadow-soft border border-boutique-border overflow-hidden">
-             {members.length === 0 ? (
+             {filteredMembers.length === 0 ? (
                <div className="p-12 text-center text-boutique-charcoalLight">No members registered in this group yet.</div>
              ) : (
                <table className="w-full text-left text-sm">
@@ -275,23 +287,23 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
                      <th className="px-6 py-3.5">Name</th>
                      <th className="px-6 py-3.5">Total Contributed</th>
                      <th className="px-6 py-3.5">Redeemed</th>
-                     <th className="px-6 py-3.5 bg-boutique-tealLight/20">Balance</th>
+                     <th className="px-6 py-3.5 bg-boutique-creamDark/30">Balance</th>
                      <th className="px-6 py-3.5 text-center">Action</th>
                    </tr>
                  </thead>
                  <tbody className="divide-y divide-boutique-border/60">
-                   {members.map((member) => (
+                   {filteredMembers.map((member) => (
                      <tr key={member.id} className="hover:bg-boutique-cream/50 transition-colors">
                        <td className="px-6 py-4">
-                         <div className="font-semibold text-boutique-charcoal">{member.name}</div>
-                         <div className="text-xs text-boutique-charcoalLight font-mono">{member.phone || '—'}</div>
+                          <div className="font-semibold text-boutique-charcoal">{member.name}</div>
+                          <div className="text-xs text-boutique-charcoalLight font-mono">{member.phone || '—'}</div>
                        </td>
                        <td className="px-6 py-4 font-semibold text-boutique-emerald">₹{member.total_contributed.toLocaleString()}</td>
                        <td className="px-6 py-4 text-boutique-charcoalLight font-medium">₹{member.total_redeemed.toLocaleString()}</td>
-                       <td className="px-6 py-4 font-bold text-teal-700 bg-boutique-tealLight/10">₹{member.balance.toLocaleString()}</td>
+                       <td className="px-6 py-4 font-bold text-boutique-charcoal bg-boutique-creamDark/10">₹{member.balance.toLocaleString()}</td>
                        <td className="px-6 py-4 text-center">
                          <Button size="sm" variant="success" onClick={() => setContributeModal(member)}>
-                            <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Contribute
+                             <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Contribute
                          </Button>
                        </td>
                      </tr>
@@ -313,7 +325,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
                <table className="w-full text-left text-sm">
                  <thead className="bg-boutique-creamDark/60 font-semibold text-xs uppercase tracking-wider text-boutique-charcoalLight border-b border-boutique-border">
                    <tr>
-                     <th className="px-6 py-3.5">Date & Time</th>
+                     <th className="px-6 py-3.5">Date &amp; Time</th>
                      <th className="px-6 py-3.5">Member</th>
                      <th className="px-6 py-3.5">Notes</th>
                      <th className="px-6 py-3.5 text-right">Amount</th>
@@ -323,7 +335,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
                    {ledger.map((entry) => (
                      <tr key={entry.id} className="hover:bg-boutique-cream/50 transition-colors">
                        <td className="px-6 py-4 text-boutique-charcoalLight text-xs">
-                         {format(new Date(entry.created_at || entry.date_time || new Date()), 'dd MMM yyyy, h:mm a')}
+                         {format(new Date(entry.date_time || new Date()), 'dd MMM yyyy, h:mm a')}
                        </td>
                        <td className="px-6 py-4 font-semibold text-boutique-charcoal">
                          {entry.bishi_members?.name || 'Unknown'}
