@@ -14,9 +14,9 @@ export async function GET(request: Request) {
 
   // Prefix checks for auto-fill helper
   if (prefix) {
-    const cleanedPrefix = prefix.trim().toLowerCase()
-    if (!/^[a-z]{6}$/.test(cleanedPrefix)) {
-      return NextResponse.json({ error: 'Prefix must be exactly 6 alphabets.' }, { status: 400 })
+    const cleanedPrefix = prefix.trim().toUpperCase()
+    if (!/^[A-Z]{6}$/.test(cleanedPrefix)) {
+      return NextResponse.json({ error: 'Prefix must be exactly 6 uppercase alphabets.' }, { status: 400 })
     }
     const { data: siblings } = await supabase
       .from('inventory')
@@ -68,10 +68,10 @@ export async function GET(request: Request) {
 
   let filtered = (allInventory || []) as any[]
   if (query) {
-    const lowercaseQuery = query.toLowerCase()
+    const upperQuery = query.toUpperCase()
     filtered = filtered.filter(item => 
-      item.name.toLowerCase().includes(lowercaseQuery) || 
-      item.custom_code.toLowerCase().includes(lowercaseQuery)
+      item.name.toUpperCase().includes(upperQuery) || 
+      item.custom_code.toUpperCase().includes(upperQuery)
     )
   }
 
@@ -106,9 +106,9 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const customCode = String(body.custom_code || '').trim().toLowerCase()
-    if (!/^[a-z]{6}-\d{3}$/.test(customCode)) {
-      return NextResponse.json({ error: 'Custom code must follow: 6 alphabets hyphen 3 digits, e.g. adchfg-001.' }, { status: 400 })
+    const customCode = String(body.custom_code || '').trim().toUpperCase()
+    if (!/^[A-Z]{6}-\d{3}$/.test(customCode)) {
+      return NextResponse.json({ error: 'Custom code must follow: 6 uppercase alphabets hyphen 3 digits, e.g. ADCHFG-001.' }, { status: 400 })
     }
 
     const [prefixPart, suffixPart] = customCode.split('-')

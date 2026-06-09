@@ -317,7 +317,7 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
         <div className="border-b-2 border-boutique-roseLight pb-6 mb-6 flex justify-between items-start">
           <div>
             <h1 className="font-serif text-3xl font-bold text-boutique-roseDark">Sonal Boutique</h1>
-            <p className="text-xs text-boutique-charcoalLight mt-1">123 Boutique Street, Pune</p>
+            <p className="text-xs text-boutique-charcoalLight mt-1">123 Boutique Street, Nagpur</p>
             <p className="text-xs text-boutique-charcoalLight">Tel: +91 9876543210</p>
           </div>
           <div className="text-right">

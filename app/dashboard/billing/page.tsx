@@ -148,11 +148,16 @@ export default function NewBillPage() {
     }
   }, [customerSearch])
 
-  // Handle auto-activation of bill-level bishi toggle when any item has Bishi toggled
+  // Sync bill-level bishi toggle with per-item bishi flags
   useEffect(() => {
     const hasAnyBishiItem = billItems.some(item => item.is_bishi)
     if (hasAnyBishiItem) {
       setIsBishiSale(true)
+    } else {
+      // No bishi items — auto-disable the toggle and clear selections
+      setIsBishiSale(false)
+      setSelectedBishiGroupId('')
+      setSelectedBishiMemberId('')
     }
   }, [billItems])
 
@@ -353,11 +358,7 @@ export default function NewBillPage() {
         }
       />
 
-      {error && (
-        <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200 shadow-sm font-medium">
-          {error}
-        </div>
-      )}
+
 
       {/* BILL DETAILS HEADER */}
       <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -784,10 +785,17 @@ export default function NewBillPage() {
           </div>
         </div>
 
-        <div className="pt-6 border-t border-boutique-border flex justify-end">
-          <Button size="lg" onClick={handleSubmit} disabled={loading} className="w-full md:w-auto">
-            {loading ? 'Processing...' : 'Generate Bill'}
-          </Button>
+        <div className="pt-6 border-t border-boutique-border space-y-3">
+          {error && (
+            <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200 shadow-sm font-medium">
+              {error}
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button size="lg" onClick={handleSubmit} disabled={loading} className="w-full md:w-auto">
+              {loading ? 'Processing...' : 'Generate Bill'}
+            </Button>
+          </div>
         </div>
       </div>
     </div>

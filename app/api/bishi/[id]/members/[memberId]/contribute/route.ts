@@ -16,7 +16,18 @@ export async function POST(request: Request, { params }: { params: { id: string,
     if (mbErr || !member) throw new Error("Member not found")
     const memberData = member as any
 
-    // 2. Insert ledger
+    // 2. Update member balances first — ledger is only written if this succeeds
+    const newTotalContributed = Number(memberData.total_contributed) + Number(amount)
+    const newBalance = Number(memberData.balance) + Number(amount)
+
+    const { error: updateErr } = await (admin.from('bishi_members') as any).update({
+       total_contributed: newTotalContributed,
+       balance: newBalance
+    }).eq('id', memberId)
+
+    if (updateErr) throw new Error("Failed to update member balances: " + updateErr.message)
+
+    // 3. Insert ledger only after member update is confirmed
     const { error: insertErr } = await (admin.from('bishi_ledger') as any).insert({
       bishi_id: bishi_id,
       bishi_member_id: memberId,
@@ -24,18 +35,6 @@ export async function POST(request: Request, { params }: { params: { id: string,
       notes: notes || null
     })
     if (insertErr) throw new Error("Failed to log contribution: " + insertErr.message)
-
-    // 3. Update member balances
-    const newTotalContributed = Number(memberData.total_contributed) + Number(amount)
-    const newBalance = Number(memberData.balance) + Number(amount)
-
-    const { error: updateErr } = await (admin.from('bishi_members') as any).update({
-       total_contributed: newTotalContributed,
-       balance: newBalance,
-       last_updated: new Date().toISOString()
-    }).eq('id', memberId)
-
-    if (updateErr) throw new Error("Failed to update member balances: " + updateErr.message)
 
     return NextResponse.json({ success: true, balance: newBalance })
   } catch (err: any) {

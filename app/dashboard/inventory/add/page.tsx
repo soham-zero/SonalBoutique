@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/Input'
 import { Package, ArrowLeft, Info, HelpCircle } from 'lucide-react'
 import Link from 'next/link'
 
-const CUSTOM_CODE_REGEX = /^[a-zA-Z]{6}-\d{3}$/
-const CUSTOM_CODE_ERROR = 'Custom code must follow: 6 alphabets hyphen 3 digits, e.g. adchfg-001.'
+const CUSTOM_CODE_REGEX = /^[A-Z]{6}-\d{3}$/
+const CUSTOM_CODE_ERROR = 'Custom code must follow: 6 uppercase alphabets hyphen 3 digits, e.g. ADCHFG-001.'
 
 export default function AddInventoryPage() {
   const router = useRouter()
@@ -22,27 +22,45 @@ export default function AddInventoryPage() {
   const [currentQuantity, setCurrentQuantity] = useState<number | ''>('')
   const [sellingPrice, setSellingPrice] = useState<number | ''>('')
   const [costPrice, setCostPrice] = useState<number | ''>('')
-  
-  const [hint, setHint] = useState<string | null>(null)
 
-  // Listen to custom code prefix
+  const [hint, setHint] = useState<string | null>(null)
+  // True only when the state change was driven by user typing, not by programmatic auto-fill
+  const userTyped = useRef(false)
+
+  // Trigger backend fetch only when the user has typed exactly 6 uppercase letters.
+  // AbortController cancels any in-flight request when the input changes before
+  // the response arrives, preventing stale results from overwriting the current value.
   useEffect(() => {
+    if (!userTyped.current) return
+    userTyped.current = false
+
     const cleaned = customCode.trim()
-    if (cleaned.length === 6 && /^[a-zA-Z]+$/.test(cleaned)) {
-      fetch(`/api/inventory?prefix=${cleaned}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.next_code) {
-            setCustomCode(data.next_code)
-            if (data.last_code) {
-              setHint(`Last used code for prefix "${cleaned}": ${data.last_code}`)
-            } else {
-              setHint(`First code for prefix "${cleaned}".`)
-            }
-          }
-        })
-        .catch(err => console.error(err))
+    if (cleaned.length !== 6 || !/^[A-Z]{6}$/.test(cleaned)) {
+      setHint(null)
+      return
     }
+
+    const controller = new AbortController()
+
+    fetch(`/api/inventory?prefix=${cleaned}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => {
+        if (data.next_code) {
+          // Programmatic update — userTyped stays false so this won't re-trigger
+          setCustomCode(data.next_code)
+          setHint(
+            data.last_code
+              ? `Last used code for prefix "${cleaned}": ${data.last_code}`
+              : `First code for prefix "${cleaned}".`
+          )
+        }
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') console.error(err)
+      })
+
+    // Cleanup: abort the fetch if customCode changes before it resolves
+    return () => controller.abort()
   }, [customCode])
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -117,7 +135,9 @@ export default function AddInventoryPage() {
                   placeholder="e.g. adchfg (will auto-suffix)"
                   value={customCode}
                   onChange={(e) => {
-                    const nextValue = e.target.value
+                    const nextValue = e.target.value.toUpperCase()
+                    // Mark this as a user-initiated change before updating state
+                    userTyped.current = true
                     setCustomCode(nextValue)
                     setCustomCodeError(
                       nextValue.trim() && !CUSTOM_CODE_REGEX.test(nextValue.trim()) && nextValue.trim().length !== 6
