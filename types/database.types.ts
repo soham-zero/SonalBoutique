@@ -129,6 +129,7 @@ export type Database = {
           description: string | null
           amount: number
           date_time: string
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
         }
         Insert: {
           id?: string
@@ -137,6 +138,7 @@ export type Database = {
           description?: string | null
           amount: number
           date_time?: string
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
         }
         Update: {
           id?: string
@@ -145,6 +147,7 @@ export type Database = {
           description?: string | null
           amount?: number
           date_time?: string
+          payment_mode?: Database["public"]["Enums"]["payment_mode_enum"]
         }
       }
       inventory_ledger: {
@@ -345,6 +348,8 @@ export type Database = {
           cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
           status: Database["public"]["Enums"]["job_status_enum"]
           due_date: string | null
+          quantity: number
+          amount: number | null
         }
         Insert: {
           id?: string
@@ -355,6 +360,8 @@ export type Database = {
           cloth_provided_by: Database["public"]["Enums"]["cloth_provided_enum"]
           status?: Database["public"]["Enums"]["job_status_enum"]
           due_date?: string | null
+          quantity?: number
+          amount?: number | null
         }
         Update: {
           id?: string
@@ -365,6 +372,8 @@ export type Database = {
           cloth_provided_by?: Database["public"]["Enums"]["cloth_provided_enum"]
           status?: Database["public"]["Enums"]["job_status_enum"]
           due_date?: string | null
+          quantity?: number
+          amount?: number | null
         }
       }
       bishi_ledger: {
@@ -375,6 +384,7 @@ export type Database = {
           contribution_amount: number
           notes: string | null
           date_time: string
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
         }
         Insert: {
           id?: string
@@ -383,6 +393,7 @@ export type Database = {
           contribution_amount: number
           notes?: string | null
           date_time?: string
+          payment_mode: Database["public"]["Enums"]["payment_mode_enum"]
         }
         Update: {
           id?: string
@@ -391,6 +402,7 @@ export type Database = {
           contribution_amount?: number
           notes?: string | null
           date_time?: string
+          payment_mode?: Database["public"]["Enums"]["payment_mode_enum"]
         }
       }
       bishi_sales: {

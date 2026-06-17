@@ -21,7 +21,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
         inventory ( name, custom_code )
       ),
       job_items (
-        id, name, description, charge, cloth_provided_by, status, due_date
+        id, name, description, charge, cloth_provided_by, status, due_date, quantity, amount
       ),
       bishi_sales (
         id, bishi_id, bishi_member_id, redeemed,

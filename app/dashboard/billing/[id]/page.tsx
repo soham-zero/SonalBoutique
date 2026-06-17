@@ -33,7 +33,12 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
   
   // Calculate subtotals
   const billItemsSubtotal = (data.bill_items || []).reduce((acc: number, item: any) => acc + Number(item.amount), 0)
-  const jobworkSubtotal = (data.job_items || []).reduce((acc: number, item: any) => acc + Number(item.charge), 0)
+  const jobworkSubtotal = (data.job_items || []).reduce((acc: number, item: any) => {
+    const qty = item.quantity ?? 1
+    const rate = Number(item.charge)
+    const amt = Number(item.amount ?? (qty * rate))
+    return acc + amt
+  }, 0)
   
   const discountVal = Number(data.discount_amount || 0)
   const grandTotal = Number(data.total_amount)
@@ -207,18 +212,27 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
           <th>Job Name</th>
           <th>Cloth Provided By</th>
           <th>Due Date</th>
-          <th class="text-right">Charge</th>
+          <th class="text-right">Rate</th>
+          <th class="text-center">Qty</th>
+          <th class="text-right">Amount</th>
         </tr>
       </thead>
       <tbody>
-        ${data.job_items.map((j: any) => `
+        ${data.job_items.map((j: any) => {
+          const qty = j.quantity ?? 1;
+          const rate = Number(j.charge);
+          const amt = Number(j.amount ?? (qty * rate));
+          return `
           <tr>
             <td><strong>${j.name}</strong>${j.description ? `<br><small>${j.description}</small>` : ''}</td>
             <td style="text-transform: capitalize;">${j.cloth_provided_by}</td>
             <td>${j.due_date ? format(new Date(j.due_date), 'dd MMM yyyy') : 'N/A'}</td>
-            <td class="text-right">₹${Number(j.charge).toFixed(2)}</td>
+            <td class="text-right">₹${rate.toFixed(2)}</td>
+            <td class="text-center">${qty}</td>
+            <td class="text-right">₹${amt.toFixed(2)}</td>
           </tr>
-        `).join('')}
+          `;
+        }).join('')}
       </tbody>
     </table>
     ` : ''}
@@ -395,21 +409,30 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
                   <th className="px-4 py-3 font-semibold text-boutique-charcoal">Job Name</th>
                   <th className="px-4 py-3 font-semibold text-boutique-charcoal">Cloth By</th>
                   <th className="px-4 py-3 font-semibold text-boutique-charcoal">Due Date</th>
-                  <th className="px-4 py-3 font-semibold text-boutique-charcoal text-right">Charge</th>
+                  <th className="px-4 py-3 font-semibold text-boutique-charcoal text-right">Rate</th>
+                  <th className="px-4 py-3 font-semibold text-boutique-charcoal text-center">Qty</th>
+                  <th className="px-4 py-3 font-semibold text-boutique-charcoal text-right">Amount</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-boutique-border">
-                {data.job_items.map((j: any) => (
-                  <tr key={j.id}>
-                    <td className="px-4 py-3">
-                      <span className="font-medium text-boutique-charcoal">{j.name}</span>
-                      {j.description && <span className="block text-xs text-boutique-charcoalLight">{j.description}</span>}
-                    </td>
-                    <td className="px-4 py-3 capitalize">{j.cloth_provided_by}</td>
-                    <td className="px-4 py-3">{j.due_date ? format(new Date(j.due_date), 'dd MMM y') : 'N/A'}</td>
-                    <td className="px-4 py-3 text-right font-medium text-boutique-charcoal">₹{Number(j.charge).toFixed(2)}</td>
-                  </tr>
-                ))}
+                {data.job_items.map((j: any) => {
+                  const qty = j.quantity ?? 1
+                  const rate = Number(j.charge)
+                  const amt = Number(j.amount ?? (qty * rate))
+                  return (
+                    <tr key={j.id}>
+                      <td className="px-4 py-3">
+                        <span className="font-medium text-boutique-charcoal">{j.name}</span>
+                        {j.description && <span className="block text-xs text-boutique-charcoalLight">{j.description}</span>}
+                      </td>
+                      <td className="px-4 py-3 capitalize">{j.cloth_provided_by}</td>
+                      <td className="px-4 py-3">{j.due_date ? format(new Date(j.due_date), 'dd MMM y') : 'N/A'}</td>
+                      <td className="px-4 py-3 text-right">₹{rate.toFixed(2)}</td>
+                      <td className="px-4 py-3 text-center">{qty}</td>
+                      <td className="px-4 py-3 text-right font-medium text-boutique-charcoal">₹{amt.toFixed(2)}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

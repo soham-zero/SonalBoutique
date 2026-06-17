@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/Input'
 
 const TYPES = ['capex', 'opex']
 const CATEGORIES = ['salary', 'electricity', 'grocery', 'maintenance', 'transport', 'advertisement', 'miscellaneous']
+const PAYMENT_MODES = ['cash', 'upi', 'split', 'credit', 'debit']
 
 export default function AddExpensePage() {
   const router = useRouter()
@@ -18,6 +19,7 @@ export default function AddExpensePage() {
   const [category, setCategory] = useState('miscellaneous')
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState<number | ''>('')
+  const [paymentMode, setPaymentMode] = useState('cash')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +34,8 @@ export default function AddExpensePage() {
           expense_type: expenseType,
           category,
           description,
-          amount: Number(amount)
+          amount: Number(amount),
+          payment_mode: paymentMode
         })
       })
 
@@ -95,15 +98,28 @@ export default function AddExpensePage() {
              onChange={(e) => setDescription(e.target.value)}
            />
 
-           <Input 
-             label="Amount (₹)" 
-             type="number"
-             min={0}
-             step="0.01"
-             value={amount}
-             onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
-             required
-           />
+           <div className="grid grid-cols-2 gap-4">
+             <Input 
+               label="Amount (₹)" 
+               type="number"
+               min={0}
+               step="0.01"
+               value={amount}
+               onChange={(e) => setAmount(e.target.value === '' ? '' : Number(e.target.value))}
+               required
+             />
+
+             <div>
+               <label className="block text-sm font-medium text-boutique-charcoal mb-1">Payment Mode</label>
+               <select 
+                 value={paymentMode} 
+                 onChange={(e) => setPaymentMode(e.target.value)}
+                 className="flex h-10 w-full rounded-md border border-boutique-border bg-white px-3 py-2 text-sm text-boutique-charcoal focus:outline-none focus:ring-2 focus:ring-boutique-roseLight capitalize"
+               >
+                 {PAYMENT_MODES.map(pm => <option key={pm} value={pm}>{pm}</option>)}
+               </select>
+             </div>
+           </div>
 
            <div className="pt-4 flex justify-end gap-3 border-t border-boutique-border mt-6">
               <Button type="button" variant="ghost" onClick={() => router.back()}>Cancel</Button>

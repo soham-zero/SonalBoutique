@@ -18,7 +18,6 @@ export default function InventoryPage() {
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [totalCount, setTotalCount] = useState(0)
-  const [lowStockCount, setLowStockCount] = useState(0)
   const LIMIT = 10
 
   const fetchItems = async (q = '', isLoadMore = false) => {
@@ -45,7 +44,6 @@ export default function InventoryPage() {
           setOffset(0)
         }
         setTotalCount(data.count || 0)
-        setLowStockCount(data.low_stock_count || 0)
         setHasMore(currentOffset + newItems.length < (data.count || 0))
       }
     } catch (e) {
@@ -86,13 +84,6 @@ export default function InventoryPage() {
         }
       />
 
-      {lowStockCount > 0 && (
-        <div className="flex items-center gap-2.5 p-3.5 bg-boutique-amberLight rounded-xl border border-amber-200 text-sm text-amber-800">
-          <AlertTriangle className="w-4 h-4 flex-shrink-0 text-boutique-amber" />
-          <span><strong>{lowStockCount}</strong> item{lowStockCount > 1 ? 's' : ''} are running low on stock (below 5 units).</span>
-        </div>
-      )}
-
       <div className="bg-white rounded-2xl shadow-soft border border-boutique-border overflow-hidden">
         <div className="p-4 border-b border-boutique-border flex items-center gap-4">
           <form onSubmit={handleSearch} className="flex-1 max-w-md relative">
@@ -126,24 +117,18 @@ export default function InventoryPage() {
               </thead>
               <tbody className="divide-y divide-boutique-border/60">
                 {items.map((item) => {
-                  const isLow = item.current_quantity < 5
                   return (
                     <tr 
                       key={item.id} 
-                      className={`hover:bg-boutique-cream/60 transition-colors ${isLow ? 'bg-boutique-amberLight/30' : ''}`}
+                      className={`hover:bg-boutique-cream/60 transition-colors`}
                     >
                       <td className="px-6 py-4 font-mono text-xs text-boutique-charcoalLight">
                         {item.custom_code}
                       </td>
                       <td className="px-6 py-4 font-medium text-boutique-charcoal">
                         {item.name}
-                        {isLow && (
-                          <span className="badge-amber ml-2 inline-flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3" /> Low Stock
-                          </span>
-                        )}
                       </td>
-                      <td className={`px-6 py-4 text-center font-bold text-lg ${isLow ? 'text-boutique-amber' : 'text-boutique-charcoal'}`}>
+                      <td className={`px-6 py-4 text-center font-bold text-lg`}>
                         {item.current_quantity}
                       </td>
                       <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">

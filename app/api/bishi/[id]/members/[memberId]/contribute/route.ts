@@ -3,11 +3,12 @@ import { createAdminClient } from '@/utils/supabase/server'
 
 export async function POST(request: Request, { params }: { params: { id: string, memberId: string } }) {
   try {
-    const { amount, notes } = await request.json()
+    const { amount, notes, payment_mode, date_time } = await request.json()
     const bishi_id = params.id
     const memberId = params.memberId
     
     if (Number(amount) <= 0) throw new Error("Contribution must be greater than 0")
+    if (!payment_mode) throw new Error("payment_mode is required")
 
     const admin = createAdminClient()
 
@@ -28,12 +29,19 @@ export async function POST(request: Request, { params }: { params: { id: string,
     if (updateErr) throw new Error("Failed to update member balances: " + updateErr.message)
 
     // 3. Insert ledger only after member update is confirmed
-    const { error: insertErr } = await (admin.from('bishi_ledger') as any).insert({
+    const ledgerPayload: any = {
       bishi_id: bishi_id,
       bishi_member_id: memberId,
       contribution_amount: Number(amount),
+      payment_mode: payment_mode,
       notes: notes || null
-    })
+    }
+
+    if (date_time) {
+      ledgerPayload.date_time = new Date(date_time).toISOString()
+    }
+
+    const { error: insertErr } = await (admin.from('bishi_ledger') as any).insert(ledgerPayload)
     if (insertErr) throw new Error("Failed to log contribution: " + insertErr.message)
 
     return NextResponse.json({ success: true, balance: newBalance })

@@ -122,6 +122,7 @@ export default function ExpensesPage() {
                   <th className="px-6 py-4">Date</th>
                   <th className="px-6 py-4">Classification</th>
                   <th className="px-6 py-4">Description</th>
+                  <th className="px-6 py-4">Payment Mode</th>
                   <th className="px-6 py-4 text-right">Amount</th>
                 </tr>
               </thead>
@@ -139,6 +140,11 @@ export default function ExpensesPage() {
                     </td>
                     <td className="px-6 py-4 text-boutique-charcoalLight max-w-xs truncate">
                       {exp.description || '-'}
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="capitalize px-2.5 py-1 bg-boutique-roseLight text-boutique-charcoal text-xs rounded-md font-medium">
+                        {exp.payment_mode || '-'}
+                      </span>
                     </td>
                     <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">
                       ₹{exp.amount.toFixed(2)}

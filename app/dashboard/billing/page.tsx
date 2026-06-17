@@ -10,7 +10,7 @@ import { CalendarClock, ChevronDown, ChevronUp, Search, Plus, Trash2, User, Phon
 // Types
 type InventoryItem = { id: string; name: string; custom_code: string; selling_price: number; current_quantity: number }
 type BillItem = { tempId: number; inventory_id: string; name: string; quantity: number; price_sold_at: number; amount: number; is_bishi: boolean }
-type JobItem = { tempId: number; name: string; description: string; charge: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string }
+type JobItem = { tempId: number; name: string; description: string; charge: number; quantity: number; amount: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string }
 type BishiGroup = { id: string; name: string }
 type BishiMember = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string; balance: number }
@@ -223,6 +223,8 @@ export default function NewBillPage() {
       name: '',
       description: '',
       charge: 0,
+      quantity: 1,
+      amount: 0,
       cloth_provided_by: 'customer',
       due_date: defaultDueDate.toISOString().split('T')[0]
     }])
@@ -231,7 +233,9 @@ export default function NewBillPage() {
   const updateJobItem = (tempId: number, field: keyof JobItem, val: any) => {
     setJobItems(prev => prev.map(item => {
       if (item.tempId === tempId) {
-        return { ...item, [field]: val }
+        const updated = { ...item, [field]: val }
+        updated.amount = (updated.quantity || 1) * (updated.charge || 0)
+        return updated
       }
       return item
     }))
@@ -306,6 +310,8 @@ export default function NewBillPage() {
         name: j.name || 'Jobwork Item',
         description: j.description,
         charge: j.charge,
+        quantity: j.quantity,
+        amount: j.amount,
         cloth_provided_by: j.cloth_provided_by,
         due_date: j.due_date,
       })),
@@ -598,7 +604,8 @@ export default function NewBillPage() {
               <div className="space-y-4">
                 {jobItems.map((job, idx) => (
                   <div key={job.tempId} className="flex flex-col md:grid md:grid-cols-12 gap-4 items-end p-4 bg-gray-50 rounded-md border border-boutique-border">
-                    <div className="col-span-3 w-full">
+                    {/* Row 1 */}
+                    <div className="col-span-4 w-full">
                       <Input 
                         label={`#${idx+1} Job Name`} 
                         placeholder="e.g. Kurti Stitching"
@@ -607,7 +614,7 @@ export default function NewBillPage() {
                         required
                       />
                     </div>
-                    <div className="col-span-3 w-full">
+                    <div className="col-span-8 w-full">
                       <Input 
                         label="Description" 
                         placeholder="e.g. Size M, blue thread"
@@ -615,17 +622,9 @@ export default function NewBillPage() {
                         onChange={(e) => updateJobItem(job.tempId, 'description', e.target.value)}
                       />
                     </div>
-                    <div className="col-span-2 w-full">
-                      <Input 
-                        label="Charge (₹)" 
-                        type="number" 
-                        min={0} 
-                        value={job.charge || ''} 
-                        onChange={(e) => updateJobItem(job.tempId, 'charge', Number(e.target.value))}
-                        required
-                      />
-                    </div>
-                    <div className="col-span-2 w-full">
+
+                    {/* Row 2 */}
+                    <div className="col-span-3 w-full">
                       <label className="block text-sm font-medium text-boutique-charcoal mb-1">Cloth Provided By</label>
                       <select 
                         value={job.cloth_provided_by} 
@@ -636,12 +635,41 @@ export default function NewBillPage() {
                         <option value="boutique">Boutique</option>
                       </select>
                     </div>
-                    <div className="col-span-2 w-full">
+                    <div className="col-span-3 w-full">
                       <Input 
                         label="Due Date"
                         type="date"
                         value={job.due_date}
                         onChange={(e) => updateJobItem(job.tempId, 'due_date', e.target.value)}
+                      />
+                    </div>
+                    <div className="col-span-2 w-full">
+                      <Input 
+                        label="Rate (₹)" 
+                        type="number" 
+                        min={0} 
+                        value={job.charge || ''} 
+                        onChange={(e) => updateJobItem(job.tempId, 'charge', Number(e.target.value))}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2 w-full">
+                      <Input 
+                        label="Qty" 
+                        type="number" 
+                        min={1} 
+                        value={job.quantity || 1} 
+                        onChange={(e) => updateJobItem(job.tempId, 'quantity', Number(e.target.value))}
+                        required
+                      />
+                    </div>
+                    <div className="col-span-2 w-full">
+                      <Input 
+                        label="Amount (₹)" 
+                        type="number" 
+                        value={job.amount || 0}
+                        disabled
+                        required
                       />
                     </div>
                     <div className="col-span-12 w-full text-right">

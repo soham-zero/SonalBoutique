@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       const existingCust = existingCustData as any
 
       const billTotalAmount = bill_items.reduce((acc: number, item: any) => acc + (Number(item.quantity) * Number(item.price_sold_at || 0) - Number(item.discount || 0)), 0)
-        + job_items.reduce((acc: number, item: any) => acc + Number(item.charge || 0), 0)
+        + job_items.reduce((acc: number, item: any) => acc + (Number(item.amount) || (Number(item.quantity || 1) * Number(item.charge || 0))), 0)
 
       const discountVal = Number(payload.discount_amount || 0)
       const finalTotal = billTotalAmount - discountVal
@@ -177,7 +177,7 @@ export async function POST(request: Request) {
 
     // Add job charges to total
     for (const job of job_items) {
-      total_amount += Number(job.charge)
+      total_amount += Number(job.amount) || (Number(job.quantity || 1) * Number(job.charge))
     }
 
     const finalNetTotal = total_amount - discount_amount
@@ -241,6 +241,8 @@ export async function POST(request: Request) {
 
     // Step 6: Insert Job Items
     for (const job of job_items) {
+      const q = Number(job.quantity || 1)
+      const amt = Number(job.amount) || (q * Number(job.charge))
       const { error: jobErr } = await (adminClient.from('job_items') as any).insert({
         transaction_id: txId,
         name: job.name,
@@ -248,7 +250,9 @@ export async function POST(request: Request) {
         charge: job.charge,
         cloth_provided_by: job.cloth_provided_by,
         due_date: job.due_date || null,
-        status: 'ordered'
+        status: 'ordered',
+        quantity: q,
+        amount: amt
       })
 
       if (jobErr) throw new Error('Failed to create job item: ' + jobErr.message)
