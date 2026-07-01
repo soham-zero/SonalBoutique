@@ -3,6 +3,7 @@ import { createClient, createAdminClient } from '@/utils/supabase/server'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
+  const nextNumberOnly = searchParams.get('next_number') === 'true'
   const query = searchParams.get('q') || ''
   const limit = Number(searchParams.get('limit')) || 10
   const offset = Number(searchParams.get('offset')) || 0
@@ -10,6 +11,23 @@ export async function GET(request: Request) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  if (nextNumberOnly) {
+    const { data: txs, error: txsErr } = await supabase
+      .from('transactions')
+      .select('bill_number')
+    if (txsErr) return NextResponse.json({ error: txsErr.message }, { status: 500 })
+    let maxNum = 0
+    if (txs) {
+      txs.forEach((tx: any) => {
+        const num = parseInt(tx.bill_number, 10)
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num
+        }
+      })
+    }
+    return NextResponse.json({ next_bill_number: String(maxNum + 1) })
+  }
 
   let dbQuery = supabase
     .from('transactions')
@@ -21,14 +39,14 @@ export async function GET(request: Request) {
     const { data: matchingCustomers } = await supabase
       .from('customers')
       .select('id')
-      .or(`name.ilike.%${query}%,phone.ilike.%${query}%`)
+      .or(`name.ilike.${query}%,phone.ilike.${query}%`)
 
     const customerIds = ((matchingCustomers || []) as any[]).map((c: any) => c.id)
 
     if (customerIds.length > 0) {
-      dbQuery = dbQuery.or(`bill_number.ilike.%${query}%,customer_id.in.(${customerIds.map(id => `"${id}"`).join(',')})`)
+      dbQuery = dbQuery.or(`bill_number.ilike.${query}%,customer_id.in.(${customerIds.map(id => `"${id}"`).join(',')})`)
     } else {
-      dbQuery = dbQuery.ilike('bill_number', `%${query}%`)
+      dbQuery = dbQuery.ilike('bill_number', `${query}%`)
     }
   }
 
@@ -51,9 +69,18 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const adminClient = createAdminClient()
+
+  // Rollback state tracking variables
+  let customerCreatedId: string | null = null
+  let customerUpdatedData: { id: string; total_billed: number; total_paid: number; balance: number } | null = null
+  let createdTransactionId: string | null = null
+  const inventoryUpdates: { id: string; quantityToRestore: number }[] = []
+  const inventoryLedgerIds: string[] = []
+  let bishiMemberUpdatedData: { id: string; total_redeemed: number; balance: number } | null = null
+
   try {
     const payload = await request.json()
-    const adminClient = createAdminClient()
     
     const {
       bill_items = [], // { inventory_id, quantity, is_bishi }[]
@@ -72,6 +99,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Must provide at least one bill item or job item.' }, { status: 400 })
     }
 
+    if (!customer_name || !customer_name.trim()) {
+      return NextResponse.json({ error: 'Customer Name is required.' }, { status: 400 })
+    }
+
+    if (!customer_phone || !customer_phone.trim()) {
+      return NextResponse.json({ error: 'Customer Phone is required.' }, { status: 400 })
+    }
+
     let billDateTime = new Date().toISOString()
     if (bill_date_time) {
       const parsedBillDate = new Date(bill_date_time)
@@ -81,25 +116,37 @@ export async function POST(request: Request) {
       billDateTime = parsedBillDate.toISOString()
     }
 
-    // Step 1: Determine Bill Number
+    // Step 1: Determine and Validate Bill Number
     let billNumber = manualBillNumber
-    if (!billNumber) {
-      const { data: latestTx, error: latestErr } = await adminClient
-        .from('transactions')
-        .select('bill_number')
-        .order('bill_number', { ascending: false })
-        .limit(100) // retrieve a decent sample to find true max
+    
+    // Fetch current existing bill numbers for validation and generation
+    const { data: allTx, error: allErr } = await adminClient
+      .from('transactions')
+      .select('bill_number')
+    if (allErr) throw new Error('Failed to retrieve existing transactions: ' + allErr.message)
 
-      let maxNum = 0
-      if (latestTx && latestTx.length > 0) {
-        latestTx.forEach((tx: any) => {
-          const num = parseInt(tx.bill_number, 10)
-          if (!isNaN(num) && num > maxNum) {
-            maxNum = num
-          }
-        })
-      }
+    let maxNum = 0
+    if (allTx && allTx.length > 0) {
+      allTx.forEach((tx: any) => {
+        const num = parseInt(tx.bill_number, 10)
+        if (!isNaN(num) && num > maxNum) {
+          maxNum = num
+        }
+      })
+    }
+
+    if (!billNumber) {
       billNumber = String(maxNum + 1)
+    } else {
+      const proposedNum = parseInt(billNumber, 10)
+      if (isNaN(proposedNum)) {
+        return NextResponse.json({ error: 'Bill number must be a valid integer.' }, { status: 400 })
+      }
+      if (proposedNum <= maxNum) {
+        return NextResponse.json({
+          error: `Bill number ${proposedNum} is duplicate or stale. The next available bill number is ${maxNum + 1}.`
+        }, { status: 400 })
+      }
     }
 
     // Step 2: Customer creation / upsert
@@ -124,15 +171,25 @@ export async function POST(request: Request) {
         const newBilled = Number(existingCust.total_billed) + finalTotal
         const newPaid = Number(existingCust.total_paid) + Number(amount_paid)
         const newBalance = Number(existingCust.balance) + due
-        await (adminClient.from('customers') as any).update({
+        
+        customerUpdatedData = {
+          id: customerId,
+          total_billed: Number(existingCust.total_billed),
+          total_paid: Number(existingCust.total_paid),
+          balance: Number(existingCust.balance)
+        }
+
+        const { error: custUpdErr } = await (adminClient.from('customers') as any).update({
           name: customer_name || existingCust.name,
           total_billed: newBilled,
           total_paid: newPaid,
           balance: newBalance
         }).eq('id', customerId)
+
+        if (custUpdErr) throw new Error('Customer update err: ' + custUpdErr.message)
       } else {
         const { data: newCust, error: custErr } = await (adminClient.from('customers') as any).insert({
-          name: customer_name || 'Walk-in',
+          name: customer_name,
           phone: customer_phone,
           total_billed: finalTotal,
           total_paid: Number(amount_paid),
@@ -141,6 +198,7 @@ export async function POST(request: Request) {
 
         if (custErr) throw new Error('Customer creation err: ' + custErr.message)
         customerId = (newCust as any).id
+        customerCreatedId = customerId
       }
     }
 
@@ -199,14 +257,14 @@ export async function POST(request: Request) {
 
     if (txError) throw new Error('Failed to create transaction: ' + txError.message)
 
-    const txId = (transaction as any).id
+    createdTransactionId = (transaction as any).id
 
     // Step 5: Insert Bill Items & update inventory sequentially
     for (const item of enriched_bill_items) {
       const { data: biData, error: biErr } = await (adminClient
         .from('bill_items') as any)
         .insert({
-          transaction_id: txId,
+          transaction_id: createdTransactionId,
           inventory_id: item.inventory_id,
           quantity: item.quantity,
           price_sold_at: item.price_sold_at,
@@ -219,23 +277,31 @@ export async function POST(request: Request) {
 
       // Debit inventory
       const newQty = item.current_quantity - item.quantity
-      await (adminClient.from('inventory') as any).update({ current_quantity: newQty }).eq('id', item.inventory_id)
+      inventoryUpdates.push({ id: item.inventory_id, quantityToRestore: item.quantity })
+      const { error: invUpdErr } = await (adminClient.from('inventory') as any).update({ current_quantity: newQty }).eq('id', item.inventory_id)
+      if (invUpdErr) throw new Error("Failed to update inventory: " + invUpdErr.message)
 
       // Inventory ledger
-      await (adminClient.from('inventory_ledger') as any).insert({
+      const { data: ledgerData, error: ledgerErr } = await (adminClient.from('inventory_ledger') as any).insert({
         inventory_id: item.inventory_id,
         quantity_added: -item.quantity,
         cost_price: item.price_sold_at,
         date_time: billDateTime
-      })
+      }).select('id').single()
+      if (ledgerErr) throw new Error("Failed to insert inventory ledger: " + ledgerErr.message)
+      
+      if (ledgerData) {
+        inventoryLedgerIds.push((ledgerData as any).id)
+      }
 
       // Bishi check for bill items
       if (item.is_bishi && bishi_id && bishi_member_id) {
-        await (adminClient.from('bishi_bill_items') as any).insert({
+        const { error: bbiErr } = await (adminClient.from('bishi_bill_items') as any).insert({
           bill_item_id: (biData as any).id,
           bishi_id,
           bishi_member_id
         })
+        if (bbiErr) throw new Error("Failed to insert bishi bill item: " + bbiErr.message)
       }
     }
 
@@ -244,7 +310,7 @@ export async function POST(request: Request) {
       const q = Number(job.quantity || 1)
       const amt = Number(job.amount) || (q * Number(job.charge))
       const { error: jobErr } = await (adminClient.from('job_items') as any).insert({
-        transaction_id: txId,
+        transaction_id: createdTransactionId,
         name: job.name,
         description: job.description || null,
         charge: job.charge,
@@ -260,31 +326,124 @@ export async function POST(request: Request) {
 
     // Step 7: Bishi Sales records
     if (bishi_id && bishi_member_id && discount_amount > 0) {
-      await (adminClient.from('bishi_sales') as any).insert({
-        transaction_id: txId,
+      const { error: bishiSaleErr } = await (adminClient.from('bishi_sales') as any).insert({
+        transaction_id: createdTransactionId,
         bishi_id,
         bishi_member_id,
         redeemed: discount_amount,
         date_time: billDateTime
       })
+      if (bishiSaleErr) throw new Error('Failed to create bishi sale: ' + bishiSaleErr.message)
 
       // Update Member
-      const { data: member } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', bishi_member_id).single()
+      const { data: member, error: memberFetchErr } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', bishi_member_id).single()
+      if (memberFetchErr) throw new Error('Failed to fetch bishi member: ' + memberFetchErr.message)
       const memberData = member as any
       if (memberData) {
+        bishiMemberUpdatedData = {
+          id: bishi_member_id,
+          total_redeemed: Number(memberData.total_redeemed),
+          balance: Number(memberData.balance)
+        }
         const updatedRedeemed = Number(memberData.total_redeemed) + discount_amount
         const updatedBalance = Number(memberData.balance) - discount_amount
-        await (adminClient.from('bishi_members') as any).update({
+        const { error: memUpdErr } = await (adminClient.from('bishi_members') as any).update({
           total_redeemed: updatedRedeemed,
           balance: updatedBalance
         }).eq('id', bishi_member_id)
+        if (memUpdErr) throw new Error('Failed to update bishi member: ' + memUpdErr.message)
       }
     }
 
-    return NextResponse.json({ success: true, transaction_id: txId })
+    return NextResponse.json({ success: true, transaction_id: createdTransactionId })
 
   } catch (err: any) {
-    console.error("Billing transaction error", err)
+    console.error("Billing transaction error. Starting rollback...", err)
+
+    // Rollback DB Changes in reverse order
+    // Rollback DB Changes in reverse order with isolated try-catch blocks
+    if (bishiMemberUpdatedData) {
+      try {
+        await (adminClient.from('bishi_members') as any)
+          .update({
+            total_redeemed: bishiMemberUpdatedData.total_redeemed,
+            balance: bishiMemberUpdatedData.balance
+          })
+          .eq('id', bishiMemberUpdatedData.id)
+      } catch (e) {
+        console.error("Rollback of bishi member failed:", e)
+      }
+    }
+
+    for (const invUpd of inventoryUpdates) {
+      try {
+        const { data: inv } = await adminClient
+          .from('inventory')
+          .select('current_quantity')
+          .eq('id', invUpd.id)
+          .single()
+        const currentQty = inv ? Number((inv as any).current_quantity) : 0
+        await (adminClient.from('inventory') as any)
+          .update({ current_quantity: currentQty + invUpd.quantityToRestore })
+          .eq('id', invUpd.id)
+      } catch (e) {
+        console.error(`Rollback of inventory item ${invUpd.id} failed:`, e)
+      }
+    }
+
+    if (inventoryLedgerIds.length > 0) {
+      try {
+        await (adminClient.from('inventory_ledger') as any)
+          .delete()
+          .in('id', inventoryLedgerIds)
+      } catch (e) {
+        console.error("Rollback of inventory ledger failed:", e)
+      }
+    }
+
+    if (createdTransactionId) {
+      try {
+        // Explicitly delete dependents first to prevent constraint violations
+        await (adminClient.from('bishi_sales') as any).delete().eq('transaction_id', createdTransactionId)
+        await (adminClient.from('job_items') as any).delete().eq('transaction_id', createdTransactionId)
+        
+        const { data: bItems } = await adminClient.from('bill_items').select('id').eq('transaction_id', createdTransactionId)
+        if (bItems && bItems.length > 0) {
+          const bItemIds = bItems.map((bi: any) => bi.id)
+          await (adminClient.from('bishi_bill_items') as any).delete().in('bill_item_id', bItemIds)
+        }
+        await (adminClient.from('bill_items') as any).delete().eq('transaction_id', createdTransactionId)
+
+        await (adminClient.from('transactions') as any)
+          .delete()
+          .eq('id', createdTransactionId)
+      } catch (e) {
+        console.error("Rollback of transaction records failed:", e)
+      }
+    }
+
+    if (customerCreatedId) {
+      try {
+        await (adminClient.from('customers') as any)
+          .delete()
+          .eq('id', customerCreatedId)
+      } catch (e) {
+        console.error("Rollback of created customer failed:", e)
+      }
+    } else if (customerUpdatedData) {
+      try {
+        await (adminClient.from('customers') as any)
+          .update({
+            total_billed: customerUpdatedData.total_billed,
+            total_paid: customerUpdatedData.total_paid,
+            balance: customerUpdatedData.balance
+          })
+          .eq('id', customerUpdatedData.id)
+      } catch (e) {
+        console.error("Rollback of updated customer failed:", e)
+      }
+    }
+
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
 }

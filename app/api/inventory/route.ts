@@ -70,8 +70,8 @@ export async function GET(request: Request) {
   if (query) {
     const upperQuery = query.toUpperCase()
     filtered = filtered.filter(item => 
-      item.name.toUpperCase().includes(upperQuery) || 
-      item.custom_code.toUpperCase().includes(upperQuery)
+      item.name.toUpperCase().startsWith(upperQuery) || 
+      item.custom_code.toUpperCase().startsWith(upperQuery)
     )
   }
 

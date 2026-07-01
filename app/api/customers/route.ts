@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   }
 
   if (q) {
-     query = query.or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+     query = query.or(`name.ilike.${q}%,phone.ilike.${q}%`)
   }
 
   const { data, error, count } = await query

@@ -66,20 +66,12 @@ export default function NewBillPage() {
   useEffect(() => {
     async function fetchNextBillNumber() {
       try {
-        const res = await fetch('/api/billing?limit=1')
+        const res = await fetch('/api/billing?next_number=true')
         if (res.ok) {
           const data = await res.json()
-          const txs = data.transactions || []
-          let nextNum = 1
-          if (txs.length > 0) {
-            // Find max bill number from latest entries
-            const maxVal = txs.reduce((max: number, tx: any) => {
-              const num = parseInt(tx.transaction_number, 10)
-              return (!isNaN(num) && num > max) ? num : max
-            }, 0)
-            nextNum = maxVal + 1
+          if (data.next_bill_number) {
+            setBillNumber(data.next_bill_number)
           }
-          setBillNumber(String(nextNum))
         }
       } catch (e) {
         console.error("Failed to fetch next bill number", e)
@@ -170,7 +162,7 @@ export default function NewBillPage() {
   }
 
   const calcJobworkSubtotal = () => {
-    return jobItems.reduce((acc, item) => acc + item.charge, 0)
+    return jobItems.reduce((acc, item) => acc + item.amount, 0)
   }
 
   const calcTotalAmount = () => {
@@ -274,8 +266,13 @@ export default function NewBillPage() {
       return
     }
 
-    if (dueAmount > 0 && !customerPhone) {
-      setError("Customer Phone is required for pending due amounts.")
+    if (!customerName.trim()) {
+      setError("Customer Name is required.")
+      return
+    }
+
+    if (!customerPhone.trim()) {
+      setError("Customer Phone is required.")
       return
     }
     
@@ -318,7 +315,7 @@ export default function NewBillPage() {
       payment_mode: paymentMode,
       amount_paid: Number(amountPaid),
       discount_amount: discountAmount,
-      customer_name: customerName || customerSearch || 'Walk-in',
+      customer_name: customerName.trim(),
       customer_phone: customerPhone,
       bishi_id: isBishiSale ? selectedBishiGroupId : null,
       bishi_member_id: isBishiSale ? selectedBishiMemberId : null,
@@ -347,8 +344,8 @@ export default function NewBillPage() {
   // Filter inventory via sequence search
   const filteredInventory = invSearchQuery.length > 0
     ? inventoryList.filter(inv => 
-        inv.name.toLowerCase().includes(invSearchQuery.toLowerCase()) || 
-        inv.custom_code.toLowerCase().includes(invSearchQuery.toLowerCase())
+        inv.name.toLowerCase().startsWith(invSearchQuery.toLowerCase()) || 
+        inv.custom_code.toLowerCase().startsWith(invSearchQuery.toLowerCase())
       )
     : []
 

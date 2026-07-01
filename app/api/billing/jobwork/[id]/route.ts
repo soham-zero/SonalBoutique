@@ -37,7 +37,7 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { next_status, employee_id } = await request.json()
+    const { next_status, employee_id, changed_at } = await request.json()
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -61,7 +61,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
         job_item_id: params.id,
         employee_id,
         work: next_status,
-        changed_at: new Date().toISOString()
+        changed_at: changed_at || new Date().toISOString()
       })
 
     if (ledgerErr) throw new Error(ledgerErr.message)

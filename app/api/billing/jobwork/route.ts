@@ -41,7 +41,7 @@ export async function GET(request: Request) {
 
   // Search by job name
   if (q) {
-    dbQuery = dbQuery.ilike('name', `%${q}%`)
+    dbQuery = dbQuery.ilike('name', `${q}%`)
   }
 
   dbQuery = dbQuery

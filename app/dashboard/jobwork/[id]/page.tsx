@@ -50,6 +50,11 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
   const [employees, setEmployees] = useState<Employee[]>([])
   
   const [selectedEmployee, setSelectedEmployee] = useState<string>('')
+  const [changedAt, setChangedAt] = useState<string>(() => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+    return now.toISOString().slice(0, 16)
+  })
   
   const [loading, setLoading] = useState(true)
   const [updating, setUpdating] = useState(false)
@@ -103,7 +108,8 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           next_status: nextStage,
-          employee_id: selectedEmployee
+          employee_id: selectedEmployee,
+          changed_at: new Date(changedAt).toISOString()
         })
       })
 
@@ -114,6 +120,10 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
 
       await fetchJobDetails()
       setSelectedEmployee('')
+      // Reset changedAt to local now
+      const now = new Date()
+      now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+      setChangedAt(now.toISOString().slice(0, 16))
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -232,6 +242,17 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
                     <option key={e.id} value={e.id}>{e.name}</option>
                   ))}
                 </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-boutique-charcoal mb-1">Date &amp; Time</label>
+                <input 
+                  type="datetime-local"
+                  value={changedAt}
+                  onChange={(e) => setChangedAt(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-boutique-border bg-white px-3 py-2 text-sm text-boutique-charcoal focus:outline-none focus:ring-2 focus:ring-boutique-roseLight"
+                  required
+                />
               </div>
 
               <Button 

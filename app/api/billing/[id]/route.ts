@@ -18,7 +18,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
       ),
       bill_items (
         id, quantity, price_sold_at, amount, inventory_id,
-        inventory ( name, custom_code )
+        inventory ( name, custom_code ),
+        bishi_bill_items ( id, bishi_id, bishi_member_id )
       ),
       job_items (
         id, name, description, charge, cloth_provided_by, status, due_date, quantity, amount

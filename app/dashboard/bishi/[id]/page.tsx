@@ -265,8 +265,8 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
 
   const totalPool = members.reduce((acc, m) => acc + Number(m.total_contributed), 0)
   const filteredMembers = members.filter(m =>
-    m.name.toLowerCase().includes(memberSearch.toLowerCase()) ||
-    (m.phone && m.phone.includes(memberSearch))
+    m.name.toLowerCase().startsWith(memberSearch.toLowerCase()) ||
+    (m.phone && m.phone.startsWith(memberSearch))
   )
 
   // Ledger running total (contributions - redemptions)

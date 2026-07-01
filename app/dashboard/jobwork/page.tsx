@@ -26,6 +26,7 @@ type JobItem = {
       phone: string
     } | null
   } | null
+  item_number?: number
 }
 
 type Employee = {
@@ -50,6 +51,38 @@ export default function JobWorkPage() {
   const [deliveringIds, setDeliveringIds] = useState<Record<string, boolean>>({})
 
   const LIMIT = 10
+
+  const sortedJobs = React.useMemo(() => {
+    // assign temporary relative item numbers for sorting among items with identical bill numbers
+    const txCounts: Record<string, number> = {}
+    const jobsWithItemNum = jobs.map(job => {
+      const txId = job.transactions?.id || 'none'
+      if (txCounts[txId] === undefined) {
+        txCounts[txId] = 0
+      }
+      txCounts[txId] += 1
+      return { ...job, item_number: txCounts[txId] }
+    })
+
+    return jobsWithItemNum.sort((a, b) => {
+      // 1. Sort by due_date ascending (nearer date above)
+      if (!a.due_date && b.due_date) return 1
+      if (a.due_date && !b.due_date) return -1
+      if (!a.due_date && !b.due_date) return 0
+      
+      const dateA = new Date(a.due_date!).getTime()
+      const dateB = new Date(b.due_date!).getTime()
+      if (dateA !== dateB) return dateA - dateB
+
+      // 2. Sort by bill number ascending (numerically)
+      const billA = parseInt(a.transactions?.bill_number || '0', 10)
+      const billB = parseInt(b.transactions?.bill_number || '0', 10)
+      if (billA !== billB) return billA - billB
+
+      // 3. Sort by item number within same bill
+      return (a.item_number || 0) - (b.item_number || 0)
+    })
+  }, [jobs])
 
   const fetchJobs = async (isLoadMore = false, q = searchQuery, status = statusFilter) => {
     if (activeTab === 'inventory') return
@@ -237,96 +270,112 @@ export default function JobWorkPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-boutique-border/60">
-                    {jobs.map((job) => {
-                      const overdue = activeTab === 'active' && isOverdue(job.due_date)
-                      
-                      return (
-                        <tr key={job.id} className="hover:bg-boutique-cream/30 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs text-boutique-charcoalLight">
-                             {job.transactions?.bill_number ? (
-                               <Link href={`/dashboard/billing/${job.transactions.id}`} className="hover:underline text-boutique-indigo">
-                                 #{job.transactions.bill_number}
-                               </Link>
-                             ) : 'N/A'}
-                          </td>
-                          <td className="px-6 py-4 font-medium text-boutique-charcoal">
-                            {job.name}
-                          </td>
-                          <td className="px-6 py-4">
-                            <div className="text-boutique-charcoal font-medium">
-                              {job.transactions?.customers?.name || 'Walk-in'}
-                            </div>
-                            {job.transactions?.customers?.phone && (
-                              <div className="text-xs text-boutique-charcoalLight">{job.transactions.customers.phone}</div>
+                    {(() => {
+                      let lastDueDate: string | null | undefined = undefined
+                      return sortedJobs.map((job) => {
+                        const overdue = activeTab === 'active' && isOverdue(job.due_date)
+                        const showHeader = job.due_date !== lastDueDate
+                        if (showHeader) {
+                          lastDueDate = job.due_date
+                        }
+                        
+                        return (
+                          <React.Fragment key={job.id}>
+                            {showHeader && (
+                              <tr className="bg-boutique-creamDark/40 border-y border-boutique-border">
+                                <td colSpan={8} className="px-6 py-2.5 font-semibold text-boutique-charcoal text-xs uppercase tracking-wider">
+                                  Due Date: {job.due_date ? format(new Date(job.due_date), 'dd MMM yyyy') : 'No Due Date'} {overdue && <span className="text-red-600 font-bold ml-2">(Overdue)</span>}
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                          <td className="px-6 py-4 capitalize">
-                            <span className={`badge ${
-                              job.status === 'stitching' ? 'badge-indigo' : 
-                              job.status === 'complete' ? 'badge-emerald' : 
-                              job.status === 'delivered' ? 'badge-teal' :
-                              'badge-amber'
-                            }`}>
-                              {job.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4">
-                            {job.due_date ? (
-                              <span className={overdue ? "badge-ruby text-[11px]" : "text-boutique-charcoal text-xs"}>
-                                {format(new Date(job.due_date), 'dd MMM yy')}
-                                {overdue && " (Overdue)"}
-                              </span>
-                            ) : <span className="text-boutique-charcoalLight">—</span>}
-                          </td>
-                          <td className="px-6 py-4 capitalize text-boutique-charcoalLight text-xs">{job.cloth_provided_by}</td>
-                          <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">₹{job.charge.toFixed(2)}</td>
-                          <td className="px-6 py-4">
-                            <div className="flex items-center justify-center gap-2">
-                              {activeTab === 'active' && (
-                                <Link href={`/dashboard/jobwork/${job.id}`}>
-                                  <Button size="sm" variant="outline" className="gap-1">
-                                    <Eye className="w-3.5 h-3.5" />
-                                    Update
-                                  </Button>
-                                </Link>
-                              )}
-
-                              {activeTab === 'completed' && (
-                                <div className="flex items-center gap-2">
-                                  <select 
-                                    value={deliveryEmployees[job.id] || ''} 
-                                    onChange={e => setDeliveryEmployees(prev => ({ ...prev, [job.id]: e.target.value }))}
-                                    className="h-8 rounded border border-boutique-border bg-white px-2 py-0.5 text-xs text-boutique-charcoal focus:outline-none"
-                                  >
-                                    <option value="">Select Handover Employee...</option>
-                                    {employees.map(e => (
-                                      <option key={e.id} value={e.id}>{e.name}</option>
-                                    ))}
-                                  </select>
-                                  <Button 
-                                    size="sm" 
-                                    variant="success"
-                                    onClick={() => handleMarkDelivered(job.id)}
-                                    disabled={!deliveryEmployees[job.id] || deliveringIds[job.id]}
-                                  >
-                                    {deliveringIds[job.id] ? 'Delivering...' : 'Mark Delivered'}
-                                  </Button>
+                            <tr className="hover:bg-boutique-cream/30 transition-colors">
+                              <td className="px-6 py-4 font-mono text-xs text-boutique-charcoalLight">
+                                 {job.transactions?.bill_number ? (
+                                   <Link href={`/dashboard/billing/${job.transactions.id}`} className="hover:underline text-boutique-indigo">
+                                     #{job.transactions.bill_number}
+                                   </Link>
+                                 ) : 'N/A'}
+                              </td>
+                              <td className="px-6 py-4 font-medium text-boutique-charcoal">
+                                {job.name}
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="text-boutique-charcoal font-medium">
+                                  {job.transactions?.customers?.name || 'Walk-in'}
                                 </div>
-                              )}
+                                {job.transactions?.customers?.phone && (
+                                  <div className="text-xs text-boutique-charcoalLight">{job.transactions.customers.phone}</div>
+                                )}
+                              </td>
+                              <td className="px-6 py-4 capitalize">
+                                <span className={`badge ${
+                                  job.status === 'stitching' ? 'badge-indigo' : 
+                                  job.status === 'complete' ? 'badge-emerald' : 
+                                  job.status === 'delivered' ? 'badge-teal' :
+                                  'badge-amber'
+                                }`}>
+                                  {job.status}
+                                </span>
+                              </td>
+                              <td className="px-6 py-4">
+                                {job.due_date ? (
+                                  <span className={overdue ? "badge-ruby text-[11px]" : "text-boutique-charcoal text-xs"}>
+                                    {format(new Date(job.due_date), 'dd MMM yy')}
+                                    {overdue && " (Overdue)"}
+                                  </span>
+                                ) : <span className="text-boutique-charcoalLight">—</span>}
+                              </td>
+                              <td className="px-6 py-4 capitalize text-boutique-charcoalLight text-xs">{job.cloth_provided_by}</td>
+                              <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">₹{job.charge.toFixed(2)}</td>
+                              <td className="px-6 py-4">
+                                <div className="flex items-center justify-center gap-2">
+                                  {activeTab === 'active' && (
+                                    <Link href={`/dashboard/jobwork/${job.id}`}>
+                                      <Button size="sm" variant="outline" className="gap-1">
+                                        <Eye className="w-3.5 h-3.5" />
+                                        Update
+                                      </Button>
+                                    </Link>
+                                  )}
 
-                              {activeTab === 'delivered' && (
-                                <Link href={`/dashboard/jobwork/${job.id}`}>
-                                  <Button size="sm" variant="ghost" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1">
-                                    <Eye className="w-3.5 h-3.5" />
-                                    View Log
-                                  </Button>
-                                </Link>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      )
-                    })}
+                                  {activeTab === 'completed' && (
+                                    <div className="flex items-center gap-2">
+                                      <select 
+                                        value={deliveryEmployees[job.id] || ''} 
+                                        onChange={e => setDeliveryEmployees(prev => ({ ...prev, [job.id]: e.target.value }))}
+                                        className="h-8 rounded border border-boutique-border bg-white px-2 py-0.5 text-xs text-boutique-charcoal focus:outline-none"
+                                      >
+                                        <option value="">Select Handover Employee...</option>
+                                        {employees.map(e => (
+                                          <option key={e.id} value={e.id}>{e.name}</option>
+                                        ))}
+                                      </select>
+                                      <Button 
+                                        size="sm" 
+                                        variant="success"
+                                        onClick={() => handleMarkDelivered(job.id)}
+                                        disabled={!deliveryEmployees[job.id] || deliveringIds[job.id]}
+                                      >
+                                        {deliveringIds[job.id] ? 'Delivering...' : 'Mark Delivered'}
+                                      </Button>
+                                    </div>
+                                  )}
+
+                                  {activeTab === 'delivered' && (
+                                    <Link href={`/dashboard/jobwork/${job.id}`}>
+                                      <Button size="sm" variant="ghost" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1">
+                                        <Eye className="w-3.5 h-3.5" />
+                                        View Log
+                                      </Button>
+                                    </Link>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          </React.Fragment>
+                        )
+                      })
+                    })()}
                   </tbody>
                 </table>
 

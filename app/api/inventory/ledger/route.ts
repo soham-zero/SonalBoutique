@@ -19,7 +19,7 @@ export async function GET(request: Request) {
     const { data: inventoryMatches, error: inventoryError } = await (supabase
       .from('inventory') as any)
       .select('id')
-      .or(`name.ilike.%${q}%,custom_code.ilike.%${q}%`)
+      .or(`name.ilike.${q}%,custom_code.ilike.${q}%`)
 
     if (inventoryError) return NextResponse.json({ error: inventoryError.message }, { status: 500 })
 

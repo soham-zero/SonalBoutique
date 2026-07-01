@@ -53,7 +53,7 @@ export default function EmployeesPage() {
   }
 
   const filteredEmployees = employees.filter(e => 
-    e.name.toLowerCase().includes(search.toLowerCase())
+    e.name.toLowerCase().startsWith(search.toLowerCase())
   )
 
   const visibleEmployees = filteredEmployees.slice(0, offset + LIMIT)
