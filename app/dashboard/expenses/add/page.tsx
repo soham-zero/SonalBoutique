@@ -10,6 +10,12 @@ const TYPES = ['capex', 'opex']
 const CATEGORIES = ['salary', 'electricity', 'grocery', 'maintenance', 'transport', 'advertisement', 'miscellaneous']
 const PAYMENT_MODES = ['cash', 'upi', 'split', 'credit', 'debit']
 
+const getLocalDateTimeValue = () => {
+  const now = new Date()
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset())
+  return now.toISOString().slice(0, 16)
+}
+
 export default function AddExpensePage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -20,6 +26,7 @@ export default function AddExpensePage() {
   const [description, setDescription] = useState('')
   const [amount, setAmount] = useState<number | ''>('')
   const [paymentMode, setPaymentMode] = useState('cash')
+  const [dateTime, setDateTime] = useState(getLocalDateTimeValue())
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +42,8 @@ export default function AddExpensePage() {
           category,
           description,
           amount: Number(amount),
-          payment_mode: paymentMode
+          payment_mode: paymentMode,
+          date_time: dateTime
         })
       })
 
@@ -98,7 +106,7 @@ export default function AddExpensePage() {
              onChange={(e) => setDescription(e.target.value)}
            />
 
-           <div className="grid grid-cols-2 gap-4">
+           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
              <Input 
                label="Amount (₹)" 
                type="number"
@@ -119,6 +127,15 @@ export default function AddExpensePage() {
                  {PAYMENT_MODES.map(pm => <option key={pm} value={pm}>{pm}</option>)}
                </select>
              </div>
+
+             <Input 
+               label="Date & Time"
+               type="datetime-local"
+               value={dateTime}
+               max={getLocalDateTimeValue()}
+               onChange={(e) => setDateTime(e.target.value)}
+               required
+             />
            </div>
 
            <div className="pt-4 flex justify-end gap-3 border-t border-boutique-border mt-6">

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Plus, Search, Eye, AlertTriangle, BookOpen } from 'lucide-react'
+import { Plus, Search, Eye, AlertTriangle, BookOpen, Trash2 } from 'lucide-react'
 
 type InventoryItem = { id: string; name: string; custom_code: string; selling_price: number; current_quantity: number }
 
@@ -59,6 +59,20 @@ export default function InventoryPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchItems(search)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this inventory item?")) return
+    try {
+      const res = await fetch(`/api/inventory/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete item')
+      }
+      fetchItems(search)
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 
   return (
@@ -134,13 +148,22 @@ export default function InventoryPage() {
                       <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">
                         ₹{item.selling_price.toFixed(2)}
                       </td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center flex items-center justify-center gap-1.5">
                         <Link href={`/dashboard/inventory/${item.id}`}>
                           <Button variant="ghost" size="sm" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1.5">
                             <Eye className="w-4 h-4" />
                             View
                           </Button>
                         </Link>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          onClick={() => handleDelete(item.id)}
+                          className="text-red-500 hover:text-red-700 hover:bg-red-50 gap-1.5"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete
+                        </Button>
                       </td>
                     </tr>
                   )

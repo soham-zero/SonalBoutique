@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
@@ -10,7 +10,7 @@ import { CalendarClock, ChevronDown, ChevronUp, Search, Plus, Trash2, User, Phon
 // Types
 type InventoryItem = { id: string; name: string; custom_code: string; selling_price: number; current_quantity: number }
 type BillItem = { tempId: number; inventory_id: string; name: string; quantity: number; price_sold_at: number; amount: number; is_bishi: boolean }
-type JobItem = { tempId: number; name: string; description: string; charge: number; quantity: number; amount: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string }
+type JobItem = { tempId: number; name: string; description: string; charge: number; quantity: number; amount: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string; original_id?: string; status?: string }
 type BishiGroup = { id: string; name: string }
 type BishiMember = { id: string; name: string }
 type Customer = { id: string; name: string; phone: string; balance: number }
@@ -23,6 +23,12 @@ const getLocalDateTimeValue = () => {
 
 export default function NewBillPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const reviseId = searchParams.get('revise_id')
+
+  const [originalTransactionId, setOriginalTransactionId] = useState<string | null>(null)
+  const [originalBillNumber, setOriginalBillNumber] = useState<string | null>(null)
+  const [revisionReason, setRevisionReason] = useState('')
   
   // Collapsible states
   const [purchaseOpen, setPurchaseOpen] = useState(true)
@@ -107,6 +113,76 @@ export default function NewBillPage() {
   useEffect(() => {
     setBillDateTime(getLocalDateTimeValue())
   }, [])
+
+  useEffect(() => {
+    if (!reviseId) return
+
+    async function loadReviseData() {
+      try {
+        const res = await fetch(`/api/billing/${reviseId}`)
+        if (res.ok) {
+          const d = await res.json()
+          const tx = d.transaction
+          if (tx) {
+            setOriginalTransactionId(tx.id)
+            setOriginalBillNumber(tx.bill_number)
+            setPaymentMode(tx.payment_mode)
+            setAmountPaid(Number(tx.amount_paid) || '')
+            setDiscountAmount(Number(tx.discount_amount) || 0)
+
+            if (tx.customers) {
+              setSelectedCustomer({
+                id: tx.customer_id,
+                name: tx.customers.name,
+                phone: tx.customers.phone,
+                balance: Number(tx.customers.balance)
+              })
+              setCustomerName(tx.customers.name)
+              setCustomerPhone(tx.customers.phone)
+              setCustomerSearch(`${tx.customers.name} (${tx.customers.phone})`)
+            }
+
+            if (tx.bill_items) {
+              setBillItems(tx.bill_items.map((bi: any) => ({
+                tempId: Math.floor(Math.random() * 1000000),
+                inventory_id: bi.inventory_id,
+                name: bi.inventory?.name || 'Item',
+                quantity: Number(bi.quantity),
+                price_sold_at: Number(bi.price_sold_at),
+                amount: Number(bi.amount),
+                is_bishi: bi.bishi_bill_items && (Array.isArray(bi.bishi_bill_items) ? bi.bishi_bill_items.length > 0 : !!bi.bishi_bill_items)
+              })))
+            }
+
+            if (tx.job_items) {
+              setJobItems(tx.job_items.map((ji: any) => ({
+                tempId: Math.floor(Math.random() * 1000000),
+                original_id: ji.id,
+                name: ji.name,
+                description: ji.description || '',
+                charge: Number(ji.charge),
+                quantity: Number(ji.quantity || 1),
+                amount: Number(ji.amount || 0),
+                cloth_provided_by: ji.cloth_provided_by,
+                due_date: ji.due_date ? ji.due_date.split('T')[0] : '',
+                status: ji.status
+              })))
+            }
+
+            if (tx.bishi_sales && tx.bishi_sales.length > 0) {
+              const sale = tx.bishi_sales[0]
+              setIsBishiSale(true)
+              setSelectedBishiGroupId(sale.bishi_id)
+              setSelectedBishiMemberId(sale.bishi_member_id)
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load revision transaction details", e)
+      }
+    }
+    loadReviseData()
+  }, [reviseId])
 
   // Fetch Bishi Members when Group selected
   useEffect(() => {
@@ -275,6 +351,12 @@ export default function NewBillPage() {
       setError("Customer Phone is required.")
       return
     }
+
+    const phoneRegex = /^[0-9]{10}$/
+    if (!phoneRegex.test(customerPhone.trim())) {
+      setError("Customer Phone must be exactly 10 digits, containing only numbers with no spaces or symbols.")
+      return
+    }
     
     if (amountPaid === '' || amountPaid < 0) {
       setError("Please enter a valid amount paid (can be 0).")
@@ -304,6 +386,7 @@ export default function NewBillPage() {
         is_bishi: b.is_bishi
       })),
       job_items: jobItems.map(j => ({
+        original_id: j.original_id,
         name: j.name || 'Jobwork Item',
         description: j.description,
         charge: j.charge,
@@ -319,7 +402,9 @@ export default function NewBillPage() {
       customer_phone: customerPhone,
       bishi_id: isBishiSale ? selectedBishiGroupId : null,
       bishi_member_id: isBishiSale ? selectedBishiMemberId : null,
-      bill_date_time: billDateTime
+      bill_date_time: billDateTime,
+      original_transaction_id: originalTransactionId,
+      revision_reason: revisionReason
     }
 
     try {
@@ -352,14 +437,32 @@ export default function NewBillPage() {
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-20">
       <PageHeader 
-        title="New Bill" 
-        description="Generate a bill combining purchases and job work orders."
+        title={originalTransactionId ? "Revise Bill" : "New Bill"} 
+        description={originalTransactionId ? `Revising Bill #${originalBillNumber}` : "Generate a bill combining purchases and job work orders."}
         action={
           <Button variant="outline" onClick={() => router.push('/dashboard/billing/history')}>
             View History
           </Button>
         }
       />
+
+      {originalTransactionId && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 space-y-4">
+          <h3 className="font-serif font-semibold text-amber-900 flex items-center gap-2">
+            Revision Details
+          </h3>
+          <p className="text-xs text-amber-700">
+            You are creating a new bill to replace Bill #{originalBillNumber}. The original bill will be marked as REVISED, and its inventory stock, Bishi redemptions, and customer balances will be updated based on the differences in the new bill.
+          </p>
+          <Input 
+            label="Reason for Revision"
+            placeholder="e.g. Added missing kurti stitching, updated discount"
+            value={revisionReason}
+            onChange={(e) => setRevisionReason(e.target.value)}
+            required
+          />
+        </div>
+      )}
 
 
 
@@ -692,34 +795,8 @@ export default function NewBillPage() {
           {/* Left Column: Bishi and Settings */}
           <div className="space-y-4">
             
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-boutique-charcoal mb-1">Payment Mode</label>
-                <select 
-                  value={paymentMode} 
-                  onChange={(e: any) => setPaymentMode(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-boutique-border bg-white px-3 py-2 text-sm text-boutique-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-boutique-roseLight"
-                >
-                  <option value="cash">Cash</option>
-                  <option value="upi">UPI</option>
-                  <option value="credit">Credit Card</option>
-                  <option value="debit">Debit Card</option>
-                  <option value="split">Split</option>
-                </select>
-              </div>
-              
-              <Input 
-                label="Amount Paid" 
-                type="number" 
-                min={0}
-                value={amountPaid}
-                onChange={(e) => setAmountPaid(e.target.value ? Number(e.target.value) : '')}
-                required
-              />
-            </div>
-
             {/* Bishi Toggle Component */}
-            <div className="p-4 bg-white rounded-md border border-boutique-border mt-2 space-y-3">
+            <div className="p-4 bg-white rounded-md border border-boutique-border space-y-3">
               <label className="flex items-center space-x-3 cursor-pointer">
                 <input 
                   type="checkbox" 
@@ -764,13 +841,39 @@ export default function NewBillPage() {
               )}
             </div>
 
-            <div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-boutique-charcoal mb-1">Payment Mode</label>
+                <select 
+                  value={paymentMode} 
+                  onChange={(e: any) => setPaymentMode(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-boutique-border bg-white px-3 py-2 text-sm text-boutique-charcoal focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-boutique-roseLight"
+                >
+                  <option value="cash">Cash</option>
+                  <option value="upi">UPI</option>
+                  <option value="credit">Credit Card</option>
+                  <option value="debit">Debit Card</option>
+                  <option value="split">Split</option>
+                </select>
+              </div>
+              
               <Input 
                 label={isBishiSale ? "Bishi Discount (₹)" : "Discount Amount (₹)"}
                 type="number"
                 min={0}
                 value={discountAmount || ''}
                 onChange={(e) => setDiscountAmount(Number(e.target.value))}
+              />
+            </div>
+
+            <div>
+              <Input 
+                label="Amount Paid" 
+                type="number" 
+                min={0}
+                value={amountPaid}
+                onChange={(e) => setAmountPaid(e.target.value ? Number(e.target.value) : '')}
+                required
               />
             </div>
 

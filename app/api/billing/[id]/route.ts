@@ -35,6 +35,20 @@ export async function GET(request: Request, { params }: { params: { id: string }
   
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  return NextResponse.json({ transaction: data })
+  let revisionInfo = null
+  if (data) {
+    const { data: revData } = await supabase
+      .from('revisions')
+      .select(`
+        *,
+        original_tx:transactions!revisions_original_transaction_fkey(bill_number),
+        revised_tx:transactions!revisions_revised_transaction_fkey(bill_number)
+      `)
+      .or(`original_transaction_id.eq.${params.id},revised_transaction_id.eq.${params.id}`)
+      .maybeSingle()
+    revisionInfo = revData
+  }
+
+  return NextResponse.json({ transaction: data, revision: revisionInfo })
 }
 

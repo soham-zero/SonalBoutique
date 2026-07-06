@@ -22,6 +22,8 @@ export default function ExpensesPage() {
   
   const [typeFilter, setTypeFilter] = useState('')
   const [catFilter, setCatFilter] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
 
   const fetchExpenses = async (isLoadMore = false) => {
     if (isLoadMore) setLoadingMore(true)
@@ -31,6 +33,8 @@ export default function ExpensesPage() {
     const params = new URLSearchParams()
     if (typeFilter) params.append('type', typeFilter)
     if (catFilter) params.append('category', catFilter)
+    if (startDate) params.append('startDate', startDate)
+    if (endDate) params.append('endDate', endDate)
     params.append('limit', String(LIMIT))
     params.append('offset', String(currentOffset))
     
@@ -59,7 +63,7 @@ export default function ExpensesPage() {
 
   useEffect(() => {
     fetchExpenses()
-  }, [typeFilter, catFilter])
+  }, [typeFilter, catFilter, startDate, endDate])
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-20">
@@ -76,8 +80,8 @@ export default function ExpensesPage() {
         }
       />
 
-      <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-4 flex flex-col md:flex-row gap-4 items-end">
-        <div className="w-full md:w-1/3">
+      <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-4 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div>
            <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase mb-1">Expense Type</label>
            <select 
              value={typeFilter} 
@@ -88,7 +92,7 @@ export default function ExpensesPage() {
              {TYPES.map(t => <option key={t} value={t} className="capitalize">{t}</option>)}
            </select>
         </div>
-        <div className="w-full md:w-1/3">
+        <div>
            <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase mb-1">Category</label>
            <select 
              value={catFilter} 
@@ -99,12 +103,30 @@ export default function ExpensesPage() {
              {CATEGORIES.map(c => <option key={c} value={c} className="capitalize">{c}</option>)}
            </select>
         </div>
-        <div className="w-full md:w-1/3 text-right">
+        <div>
+           <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase mb-1">Start Date</label>
+           <input 
+             type="date"
+             value={startDate} 
+             onChange={(e) => setStartDate(e.target.value)}
+             className="w-full text-sm border border-boutique-border rounded-md px-3 py-2 bg-gray-50 focus:ring-boutique-roseLight focus:outline-none ring-1 ring-inset ring-gray-200 text-boutique-charcoal"
+           />
+        </div>
+        <div>
+           <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase mb-1">End Date</label>
+           <input 
+             type="date"
+             value={endDate} 
+             onChange={(e) => setEndDate(e.target.value)}
+             className="w-full text-sm border border-boutique-border rounded-md px-3 py-2 bg-gray-50 focus:ring-boutique-roseLight focus:outline-none ring-1 ring-inset ring-gray-200 text-boutique-charcoal"
+           />
+        </div>
+        <div className="text-right">
            <div className="text-sm text-boutique-charcoalLight">Loaded Total</div>
-           <div className="font-serif text-2xl font-bold text-boutique-charcoal">
+           <div className="font-serif text-xl font-bold text-boutique-charcoal">
              ₹{expenses.reduce((acc, e) => acc + Number(e.amount), 0).toFixed(2)}
            </div>
-           <div className="text-xs text-boutique-charcoalLight">{expenses.length} of {totalCount} expenses</div>
+           <div className="text-[11px] text-boutique-charcoalLight">{expenses.length} of {totalCount} expenses</div>
         </div>
       </div>
 

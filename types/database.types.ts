@@ -183,6 +183,7 @@ export type Database = {
           discount_amount: number
           amount_paid: number
           date_time: string
+          status: Database["public"]["Enums"]["transaction_status_enum"]
         }
         Insert: {
           id?: string
@@ -193,6 +194,7 @@ export type Database = {
           discount_amount?: number
           amount_paid: number
           date_time?: string
+          status?: Database["public"]["Enums"]["transaction_status_enum"]
         }
         Update: {
           id?: string
@@ -203,6 +205,7 @@ export type Database = {
           discount_amount?: number
           amount_paid?: number
           date_time?: string
+          status?: Database["public"]["Enums"]["transaction_status_enum"]
         }
       }
       customer_payments: {
@@ -474,6 +477,29 @@ export type Database = {
           changed_at?: string
         }
       }
+      revisions: {
+        Row: {
+          id: string
+          original_transaction_id: string
+          revised_transaction_id: string
+          reason: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          original_transaction_id: string
+          revised_transaction_id: string
+          reason?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          original_transaction_id?: string
+          revised_transaction_id?: string
+          reason?: string | null
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
@@ -484,10 +510,11 @@ export type Database = {
     Enums: {
       payment_mode_enum: "cash" | "upi" | "split" | "credit" | "debit"
       cloth_provided_enum: "customer" | "boutique"
-      job_status_enum: "ordered" | "preparation" | "cutting" | "stitching" | "finishing" | "ironing" | "complete" | "delivered"
+      job_status_enum: "ordered" | "preparation" | "cutting" | "stitching" | "finishing" | "ironing" | "complete" | "delivered" | "cancelled"
       unit_enum: "metres" | "pieces"
       expense_type_enum: "capex" | "opex"
       expense_category_enum: "salary" | "electricity" | "grocery" | "maintenance" | "transport" | "advertisement" | "miscellaneous"
+      transaction_status_enum: "ACTIVE" | "CANCELLED" | "REVISED"
     }
     CompositeTypes: {
       [_ in never]: never

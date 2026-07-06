@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/Input'
 import {
   Plus, ArrowLeft, ArrowUpCircle, ArrowDownCircle,
   AlertTriangle, BookOpen, X, Users, Search, CreditCard,
-  Banknote, Smartphone, SplitSquareHorizontal
+  Banknote, Smartphone, SplitSquareHorizontal, Trash2
 } from 'lucide-react'
 import Link from 'next/link'
 import { format } from 'date-fns'
@@ -260,6 +260,20 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
     } catch (e) { console.error(e) }
   }
 
+  const handleDeleteMember = async (memberId: string) => {
+    if (!confirm("Are you sure you want to delete this Bishi member?")) return
+    try {
+      const res = await fetch(`/api/bishi/${params.id}/members/${memberId}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete member')
+      }
+      fetchData()
+    } catch (e: any) {
+      alert(e.message)
+    }
+  }
+
   if (loading) return <div className="p-12 text-center text-boutique-charcoalLight animate-pulse-soft">Loading group details...</div>
   if (!group)  return <div className="p-12 text-center text-red-500">Group not found.</div>
 
@@ -393,16 +407,28 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
                   {filteredMembers.map((member) => (
                     <tr key={member.id} className="hover:bg-boutique-cream/50 transition-colors">
                       <td className="px-6 py-4">
-                        <div className="font-semibold text-boutique-charcoal">{member.name}</div>
+                        <Link href={`/dashboard/bishi/${params.id}/member/${member.id}`} className="hover:underline font-semibold text-boutique-indigo">
+                          {member.name}
+                        </Link>
                         <div className="text-xs text-boutique-charcoalLight font-mono">{member.phone || '—'}</div>
                       </td>
                       <td className="px-6 py-4 font-semibold text-boutique-emerald">₹{member.total_contributed.toLocaleString()}</td>
                       <td className="px-6 py-4 text-boutique-charcoalLight font-medium">₹{member.total_redeemed.toLocaleString()}</td>
                       <td className="px-6 py-4 font-bold text-boutique-charcoal bg-boutique-creamDark/10">₹{member.balance.toLocaleString()}</td>
                       <td className="px-6 py-4 text-center">
-                        <Button size="sm" variant="success" onClick={() => setContributeModal(member)}>
-                          <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Contribute
-                        </Button>
+                        <div className="flex items-center justify-center gap-2">
+                          <Button size="sm" variant="success" onClick={() => setContributeModal(member)}>
+                            <ArrowUpCircle className="w-3.5 h-3.5 mr-1" /> Contribute
+                          </Button>
+                          <Link href={`/dashboard/bishi/${params.id}/member/${member.id}`}>
+                            <Button size="sm" variant="outline" className="text-boutique-indigo hover:bg-boutique-indigo/10 border-boutique-indigo/30 gap-1">
+                              <Search className="w-3.5 h-3.5" /> Details
+                            </Button>
+                          </Link>
+                          <Button size="sm" variant="ghost" onClick={() => handleDeleteMember(member.id)} className="text-red-500 hover:text-red-700 hover:bg-red-50">
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

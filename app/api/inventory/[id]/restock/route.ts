@@ -3,7 +3,7 @@ import { createAdminClient } from '@/utils/supabase/server'
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { quantity_added, cost_price } = await request.json()
+    const { quantity_added, cost_price, date_time } = await request.json()
     const id = params.id
     
     const admin = createAdminClient()
@@ -14,11 +14,16 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const invData = inv as any
 
     // 2. Insert ledger
-    const { error: ledgerErr } = await (admin.from('inventory_ledger') as any).insert({
+    const ledgerPayload: any = {
       inventory_id: id,
       quantity_added: Number(quantity_added),
       cost_price: Number(cost_price)
-    })
+    }
+    if (date_time) {
+      ledgerPayload.date_time = new Date(date_time).toISOString()
+    }
+
+    const { error: ledgerErr } = await (admin.from('inventory_ledger') as any).insert(ledgerPayload)
     if (ledgerErr) throw new Error("Failed to write ledger: " + ledgerErr.message)
 
     // 3. Update quantity

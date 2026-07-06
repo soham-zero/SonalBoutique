@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { format } from 'date-fns'
 import Link from 'next/link'
-import { CreditCard, History, User, Check, X, Printer, ArrowLeft } from 'lucide-react'
+import { CreditCard, History, User, Check, X, Printer, ArrowLeft, Edit2, Save } from 'lucide-react'
+import { PasswordModal } from '@/components/ui/PasswordModal'
 
 type Customer = {
   id: string
@@ -41,6 +42,15 @@ export default function CustomerDetail({ params }: { params: { id: string } }) {
   const [payments, setPayments] = useState<Payment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+
+  // Editing states (uni-pass-proc for Name, Phone)
+  const [isEditingName, setIsEditingName] = useState(false)
+  const [isEditingPhone, setIsEditingPhone] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [showPasswordModal, setShowPasswordModal] = useState(false)
+  const [savingProtected, setSavingProtected] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
 
   // Pagination states
   const [txOffset, setTxOffset] = useState(0)
@@ -78,6 +88,8 @@ export default function CustomerDetail({ params }: { params: { id: string } }) {
       const data = await res.json()
       if (res.ok) {
         setCustomer(data.customer)
+        setEditName(data.customer.name)
+        setEditPhone(data.customer.phone)
         setTransactions(data.transactions || [])
         setPayments(data.payments || [])
         setTxOffset(0)
@@ -91,6 +103,58 @@ export default function CustomerDetail({ params }: { params: { id: string } }) {
       setError(e.message)
     } finally {
        setLoading(false)
+    }
+  }
+
+  const handleProtectedSave = () => {
+    if (isEditingName && !editName.trim()) { setError('Name cannot be empty.'); return }
+    if (isEditingPhone) {
+      const phoneRegex = /^[0-9]{10}$/
+      if (!phoneRegex.test(editPhone.trim())) {
+        setError('Phone must be exactly 10 digits.');
+        return
+      }
+    }
+    setError(null)
+    setPasswordError('')
+    setShowPasswordModal(true)
+  }
+
+  const handlePasswordConfirm = async (password: string) => {
+    setSavingProtected(true)
+    setPasswordError('')
+    try {
+      const body: any = { password }
+      if (isEditingName) body.name = editName.trim()
+      if (isEditingPhone) body.phone = editPhone.trim()
+
+      const res = await fetch(`/api/customers/${params.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+
+      if (res.status === 401) {
+        const d = await res.json()
+        setPasswordError(d.error || 'Incorrect password')
+        setSavingProtected(false)
+        return
+      }
+
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to update customer')
+      }
+
+      setShowPasswordModal(false)
+      setIsEditingName(false)
+      setIsEditingPhone(false)
+      setPasswordError('')
+      loadCustomer()
+    } catch (e: any) {
+      setPasswordError(e.message)
+    } finally {
+      setSavingProtected(false)
     }
   }
 
@@ -198,24 +262,93 @@ export default function CustomerDetail({ params }: { params: { id: string } }) {
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 print:p-0 print:m-0">
+      {/* Password Modal */}
+      {showPasswordModal && (
+        <PasswordModal
+          onConfirm={handlePasswordConfirm}
+          onClose={() => { setShowPasswordModal(false); setPasswordError('') }}
+          loading={savingProtected}
+          externalError={passwordError}
+          title="Protected Customer Edit"
+          subtitle="Manager password required to save changes"
+        />
+      )}
+
       {/* Header hidden in print */}
-      <div className="flex items-center gap-3 print:hidden">
+      <div className="flex items-center justify-between print:hidden">
         <Button variant="ghost" size="sm" className="gap-1.5" onClick={() => router.back()}>
           <ArrowLeft className="w-4 h-4" />
           Back
         </Button>
+
+        {(isEditingName || isEditingPhone) && (
+          <div className="flex gap-2">
+            <Button size="sm" variant="ghost" onClick={() => {
+              setIsEditingName(false)
+              setIsEditingPhone(false)
+              setEditName(customer.name)
+              setEditPhone(customer.phone)
+              setError(null)
+            }}>
+              Cancel
+            </Button>
+            <Button size="sm" variant="primary" onClick={handleProtectedSave}>
+              <Save className="w-4 h-4 mr-1.5" /> Save Changes
+            </Button>
+          </div>
+        )}
       </div>
 
-      <div className="print:hidden">
-        <PageHeader 
-          title={customer.name} 
-          description={`Phone: ${customer.phone}`} 
-          action={
-            <Button variant="primary" onClick={() => setIsModalOpen(true)}>
-              Record Settlement
-            </Button>
-          }
-        />
+      <div className="print:hidden bg-white rounded-xl shadow-soft border border-boutique-border p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-3 flex-1">
+          {/* Name edit */}
+          <div>
+            <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-1">Customer Name</label>
+            {isEditingName ? (
+              <input
+                type="text"
+                value={editName}
+                onChange={e => setEditName(e.target.value)}
+                className="max-w-md w-full text-xl font-bold text-boutique-charcoal bg-white border border-boutique-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-boutique-roseLight"
+                autoFocus
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-xl font-bold text-boutique-charcoal">{customer.name}</span>
+                <Button variant="ghost" size="sm" className="p-1 h-auto" onClick={() => setIsEditingName(true)}>
+                  <Edit2 className="w-3.5 h-3.5 text-boutique-charcoalLight" />
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Phone edit */}
+          <div>
+            <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-1">Phone Number</label>
+            {isEditingPhone ? (
+              <input
+                type="text"
+                value={editPhone}
+                onChange={e => setEditPhone(e.target.value)}
+                className="max-w-md w-full text-sm text-boutique-charcoal bg-white border border-boutique-border rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-boutique-roseLight"
+                autoFocus
+              />
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-boutique-charcoalLight">{customer.phone}</span>
+                <Button variant="ghost" size="sm" className="p-1 h-auto" onClick={() => setIsEditingPhone(true)}>
+                  <Edit2 className="w-3.5 h-3.5 text-boutique-charcoalLight" />
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <Button variant="primary" onClick={() => setIsModalOpen(true)}>
+            Record Settlement
+          </Button>
+        </div>
       </div>
 
       {error && (

@@ -28,13 +28,26 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ─── Scrollbar ───────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #E2DCD0; border-radius: 6px; }
 ::-webkit-scrollbar-thumb:hover { background: #C4827F; }
 
-/* ─── Card hover lift ─────────────────────────────────── */
+/* ─── Inputs ──────────────────────────────────────────── */
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:focus, select:focus, textarea:focus {
+  outline: none;
+}
+input::placeholder, textarea::placeholder {
+  color: #9E9E9E;
+  font-size: 0.875rem;
+}
+
+/* ─── Utilities ───────────────────────────────────────── */
 @layer utilities {
+  /* Card hover lift */
   .card-hover {
     @apply transition-all duration-200;
   }
@@ -79,14 +92,40 @@ h1, h2, h3, h4, h5, h6 {
   .group-header-row td {
     @apply bg-boutique-creamDark/80 px-6 py-2 text-xs font-bold uppercase tracking-widest text-boutique-charcoalLight border-y border-boutique-border;
   }
+
+  /* Page section card */
+  .section-card {
+    @apply bg-white rounded-2xl border border-boutique-border shadow-card overflow-hidden;
+  }
+
+  /* Subtle loading spinner */
+  .spinner {
+    @apply w-5 h-5 border-2 border-boutique-border border-t-boutique-roseDark rounded-full animate-spin;
+  }
+
+  /* Animate fade-in for table rows */
+  .animate-fade-in {
+    animation: fade-in 0.22s ease-out both;
+  }
+
+  /* Soft focus ring for inputs */
+  .focus-ring {
+    @apply focus:ring-2 focus:ring-boutique-rose/30 focus:border-boutique-roseDark;
+  }
 }
 
+/* ─── Keyframes ───────────────────────────────────────── */
 @keyframes fade-backdrop {
   from { opacity: 0; }
   to   { opacity: 1; }
 }
 
-/* ─── Animate-in utility ─────────────────────────────── */
-.animate-in { animation-fill-mode: both; }
-.fade-in { animation-name: fade-in; animation-duration: 0.22s; animation-timing-function: ease-out; }
-.slide-in-from-top-4 { --tw-translate-y: -1rem; }
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-down {
+  from { opacity: 0; transform: translateY(-8px) scaleY(0.97); }
+  to   { opacity: 1; transform: translateY(0) scaleY(1); }
+}

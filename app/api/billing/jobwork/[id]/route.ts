@@ -42,7 +42,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    if (!next_status || !employee_id) {
+    if (!next_status || (!employee_id && next_status !== 'cancelled')) {
       return NextResponse.json({ error: 'next_status and employee_id are required.' }, { status: 400 })
     }
 
@@ -54,12 +54,12 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     if (updateErr) throw new Error(updateErr.message)
 
-    // Write ledger entry
+    // Write ledger entry (allow null employee_id for cancellation)
     const { error: ledgerErr } = await (supabase
       .from('job_item_ledger') as any)
       .insert({
         job_item_id: params.id,
-        employee_id,
+        employee_id: employee_id || null,
         work: next_status,
         changed_at: changed_at || new Date().toISOString()
       })

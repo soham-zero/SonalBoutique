@@ -4,7 +4,7 @@ import { INVENTORY_EDIT_PASSWORD } from '@/lib/server/inventory-edit-password'
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { password, name, current_quantity } = await request.json()
+    const { password, name, selling_price } = await request.json()
 
     // ── Auth check ────────────────────────────────────────────────────────
     const supabase = createClient()
@@ -16,13 +16,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
     }
 
-    // ── Build update payload (only name + current_quantity) ────────────────
+    // ── Build update payload (only name + selling_price) ────────────────
     const updatePayload: Record<string, any> = {}
     if (name !== undefined && typeof name === 'string' && name.trim().length > 0) {
       updatePayload.name = name.trim()
     }
-    if (current_quantity !== undefined && typeof current_quantity === 'number' && current_quantity >= 0) {
-      updatePayload.current_quantity = current_quantity
+    if (selling_price !== undefined && typeof selling_price === 'number' && selling_price >= 0) {
+      updatePayload.selling_price = selling_price
     }
 
     if (Object.keys(updatePayload).length === 0) {

@@ -78,20 +78,20 @@ export function Sidebar() {
                   href={item.path}
                   onClick={() => setIsOpen(false)}
                   className={clsx(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-150 text-sm font-medium group",
+                    "relative flex items-center gap-3.5 px-3 py-3 rounded-lg transition-all duration-150 text-sm font-medium group overflow-hidden",
                     isActive 
-                      ? `${item.activeBg} ${item.color} font-semibold shadow-sm` 
+                      ? `${item.activeBg} ${item.color} font-semibold` 
                       : "text-boutique-charcoalLight hover:bg-boutique-cream hover:text-boutique-charcoal"
                   )}
                 >
-                  <item.icon className={clsx(
-                    "w-4.5 h-4.5 flex-shrink-0 transition-colors",
-                    isActive ? item.color : "text-boutique-charcoalLight group-hover:text-boutique-charcoal"
-                  )} style={{ width: '1.125rem', height: '1.125rem' }} />
-                  <span>{item.name}</span>
                   {isActive && (
-                    <span className={clsx("ml-auto w-1.5 h-1.5 rounded-full", item.color.replace('text-', 'bg-'))} />
+                    <span className={clsx("absolute left-0 top-0 bottom-0 w-1", item.color.replace('text-', 'bg-'))} />
                   )}
+                  <item.icon className={clsx(
+                    "w-5 h-5 flex-shrink-0 transition-colors",
+                    isActive ? item.color : "text-boutique-charcoalLight group-hover:text-boutique-charcoal"
+                  )} />
+                  <span>{item.name}</span>
                 </Link>
               </li>
             )
@@ -137,7 +137,7 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside 
         className={clsx(
-          "fixed inset-y-0 left-0 z-40 w-64 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex-shrink-0",
+          "fixed inset-y-0 left-0 z-40 w-[280px] transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:flex-shrink-0",
           isOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >

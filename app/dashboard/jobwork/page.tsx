@@ -35,7 +35,7 @@ type Employee = {
 }
 
 export default function JobWorkPage() {
-  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'delivered' | 'inventory'>('active')
+  const [activeTab, setActiveTab] = useState<'active' | 'completed' | 'delivered' | 'cancelled' | 'inventory'>('active')
   const [jobs, setJobs] = useState<JobItem[]>([])
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
@@ -49,6 +49,8 @@ export default function JobWorkPage() {
   // Track selected employee for each complete job to deliver it
   const [deliveryEmployees, setDeliveryEmployees] = useState<Record<string, string>>({})
   const [deliveringIds, setDeliveringIds] = useState<Record<string, boolean>>({})
+
+  const [cancellingIds, setCancellingIds] = useState<Record<string, boolean>>({})
 
   const LIMIT = 10
 
@@ -178,6 +180,33 @@ export default function JobWorkPage() {
     }
   }
 
+  const handleCancelJob = async (jobId: string) => {
+    if (!confirm("Are you sure you want to cancel this jobwork?")) return
+
+    setCancellingIds(prev => ({ ...prev, [jobId]: true }))
+    try {
+      const res = await fetch(`/api/billing/jobwork/${jobId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          next_status: 'cancelled'
+        })
+      })
+
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Failed to cancel jobwork')
+      }
+
+      setJobs(prev => prev.filter(j => j.id !== jobId))
+      setTotalCount(prev => prev - 1)
+    } catch (err: any) {
+      alert("Error: " + err.message)
+    } finally {
+      setCancellingIds(prev => ({ ...prev, [jobId]: false }))
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-20">
       <PageHeader 
@@ -187,7 +216,7 @@ export default function JobWorkPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-boutique-border">
-        {(['active', 'completed', 'delivered', 'inventory'] as const).map(tab => (
+        {(['active', 'completed', 'delivered', 'cancelled', 'inventory'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => {
@@ -200,7 +229,15 @@ export default function JobWorkPage() {
                 : 'border-transparent text-boutique-charcoalLight hover:text-boutique-charcoal'
             }`}
           >
-            {tab === 'active' ? 'Active Jobs' : tab === 'completed' ? 'Completed' : tab === 'delivered' ? 'Delivered' : 'Material Inventory'}
+            {tab === 'active' 
+              ? 'Active Jobs' 
+              : tab === 'completed' 
+                ? 'Completed' 
+                : tab === 'delivered' 
+                  ? 'Delivered' 
+                  : tab === 'cancelled' 
+                    ? 'Cancelled' 
+                    : 'Material Inventory'}
           </button>
         ))}
       </div>
@@ -330,38 +367,79 @@ export default function JobWorkPage() {
                               <td className="px-6 py-4">
                                 <div className="flex items-center justify-center gap-2">
                                   {activeTab === 'active' && (
-                                    <Link href={`/dashboard/jobwork/${job.id}`}>
-                                      <Button size="sm" variant="outline" className="gap-1">
-                                        <Eye className="w-3.5 h-3.5" />
-                                        Update
-                                      </Button>
-                                    </Link>
+                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                      <Link href={`/dashboard/jobwork/${job.id}`}>
+                                        <Button size="sm" variant="outline" className="gap-1">
+                                          <Eye className="w-3.5 h-3.5" />
+                                          Update
+                                        </Button>
+                                      </Link>
+                                      <div className="flex items-center gap-1.5 px-2 py-1">
+                                        <Button 
+                                          size="sm" 
+                                          variant="danger"
+                                          onClick={() => handleCancelJob(job.id)}
+                                          disabled={cancellingIds[job.id]}
+                                        >
+                                          {cancellingIds[job.id] ? 'Cancelling...' : 'Cancel'}
+                                        </Button>
+                                      </div>
+                                    </div>
                                   )}
 
-                                  {activeTab === 'completed' && (
-                                    <div className="flex items-center gap-2">
-                                      <select 
-                                        value={deliveryEmployees[job.id] || ''} 
-                                        onChange={e => setDeliveryEmployees(prev => ({ ...prev, [job.id]: e.target.value }))}
-                                        className="h-8 rounded border border-boutique-border bg-white px-2 py-0.5 text-xs text-boutique-charcoal focus:outline-none"
-                                      >
-                                        <option value="">Select Handover Employee...</option>
-                                        {employees.map(e => (
-                                          <option key={e.id} value={e.id}>{e.name}</option>
-                                        ))}
-                                      </select>
-                                      <Button 
-                                        size="sm" 
-                                        variant="success"
-                                        onClick={() => handleMarkDelivered(job.id)}
-                                        disabled={!deliveryEmployees[job.id] || deliveringIds[job.id]}
-                                      >
-                                        {deliveringIds[job.id] ? 'Delivering...' : 'Mark Delivered'}
-                                      </Button>
+                                  {activeTab === 'completed' && job.status === 'complete' && (
+                                    <div className="flex flex-col xl:flex-row items-center justify-center gap-2">
+                                      <Link href={`/dashboard/jobwork/${job.id}`}>
+                                        <Button size="sm" variant="outline" className="gap-1">
+                                          <Eye className="w-3.5 h-3.5" />
+                                          Update
+                                        </Button>
+                                      </Link>
+                                      
+                                      <div className="flex items-center gap-1.5 border border-boutique-border rounded px-2 py-1 bg-gray-50">
+                                        <select 
+                                          value={deliveryEmployees[job.id] || ''} 
+                                          onChange={e => setDeliveryEmployees(prev => ({ ...prev, [job.id]: e.target.value }))}
+                                          className="h-8 rounded border border-boutique-border bg-white px-2 py-0.5 text-xs text-boutique-charcoal focus:outline-none"
+                                        >
+                                          <option value="">Select Handover Employee...</option>
+                                          {employees.map(e => (
+                                            <option key={e.id} value={e.id}>{e.name}</option>
+                                          ))}
+                                        </select>
+                                        <Button 
+                                          size="sm" 
+                                          variant="success"
+                                          onClick={() => handleMarkDelivered(job.id)}
+                                          disabled={!deliveryEmployees[job.id] || deliveringIds[job.id]}
+                                        >
+                                          {deliveringIds[job.id] ? 'Delivering...' : 'Mark Delivered'}
+                                        </Button>
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 px-2 py-1">
+                                        <Button 
+                                          size="sm" 
+                                          variant="danger"
+                                          onClick={() => handleCancelJob(job.id)}
+                                          disabled={cancellingIds[job.id]}
+                                        >
+                                          {cancellingIds[job.id] ? 'Cancelling...' : 'Cancel'}
+                                        </Button>
+                                      </div>
                                     </div>
                                   )}
 
                                   {activeTab === 'delivered' && (
+                                    <Link href={`/dashboard/jobwork/${job.id}`}>
+                                      <Button size="sm" variant="ghost" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1">
+                                        <Eye className="w-3.5 h-3.5" />
+                                        View Log
+                                      </Button>
+                                    </Link>
+                                  )}
+
+                                  {activeTab === 'cancelled' && (
                                     <Link href={`/dashboard/jobwork/${job.id}`}>
                                       <Button size="sm" variant="ghost" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1">
                                         <Eye className="w-3.5 h-3.5" />

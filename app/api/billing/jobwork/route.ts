@@ -19,11 +19,12 @@ export async function GET(request: Request) {
     .from('job_items')
     .select(`
       *,
-      transactions (
-        id, bill_number, customer_id,
+      transactions!inner (
+        id, bill_number, customer_id, status,
         customers ( name, phone )
       )
     `, { count: 'exact' })
+    .eq('transactions.status', 'ACTIVE')
 
   // Status group filter
   if (group === 'active') {
@@ -32,6 +33,8 @@ export async function GET(request: Request) {
     dbQuery = dbQuery.eq('status', 'complete')
   } else if (group === 'delivered') {
     dbQuery = dbQuery.eq('status', 'delivered')
+  } else if (group === 'cancelled') {
+    dbQuery = dbQuery.eq('status', 'cancelled')
   }
 
   // Specific status override

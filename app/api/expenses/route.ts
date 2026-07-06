@@ -5,6 +5,8 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const expenseType = searchParams.get('type')
   const category = searchParams.get('category')
+  const startDate = searchParams.get('startDate')
+  const endDate = searchParams.get('endDate')
   const limit = Number(searchParams.get('limit')) || 10
   const offset = Number(searchParams.get('offset')) || 0
   
@@ -20,6 +22,12 @@ export async function GET(request: Request) {
 
   if (expenseType) dbQuery = dbQuery.eq('expense_type', expenseType)
   if (category) dbQuery = dbQuery.eq('category', category)
+  if (startDate) dbQuery = dbQuery.gte('date_time', new Date(startDate).toISOString())
+  if (endDate) {
+    const end = new Date(endDate)
+    end.setHours(23, 59, 59, 999)
+    dbQuery = dbQuery.lte('date_time', end.toISOString())
+  }
 
   const { data, error, count } = await dbQuery
   
@@ -40,13 +48,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'payment_mode is required.' }, { status: 400 })
     }
 
-    const { data, error } = await (supabase.from('expenses') as any).insert({
+    const insertPayload: any = {
       expense_type: body.expense_type,
       category: body.category,
       description: body.description || null,
       amount: Number(body.amount),
       payment_mode: body.payment_mode
-    }).select().single()
+    }
+
+    if (body.date_time) {
+      const parsedDate = new Date(body.date_time)
+      if (!isNaN(parsedDate.getTime())) {
+        insertPayload.date_time = parsedDate.toISOString()
+      }
+    }
+
+    const { data, error } = await (supabase.from('expenses') as any).insert(insertPayload).select().single()
 
     if (error) throw new Error(error.message)
 

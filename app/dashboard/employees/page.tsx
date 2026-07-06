@@ -103,7 +103,6 @@ export default function EmployeesPage() {
             <table className="w-full text-left text-sm">
               <thead className="bg-boutique-creamDark/50 text-boutique-charcoal font-medium border-b border-boutique-border">
                 <tr>
-                  <th className="px-6 py-4 text-xs uppercase tracking-wider text-boutique-charcoalLight font-semibold">ID</th>
                   <th className="px-6 py-4 text-xs uppercase tracking-wider text-boutique-charcoalLight font-semibold">Name</th>
                   <th className="px-6 py-4 text-xs uppercase tracking-wider text-boutique-charcoalLight font-semibold text-center">Action</th>
                 </tr>
@@ -111,9 +110,6 @@ export default function EmployeesPage() {
               <tbody className="divide-y divide-boutique-border">
                 {visibleEmployees.map((emp) => (
                   <tr key={emp.id} className="hover:bg-boutique-cream/30 transition-colors">
-                    <td className="px-6 py-4 text-boutique-charcoalLight font-mono text-xs">
-                       #{emp.id.substring(0, 8)}...
-                    </td>
                     <td className="px-6 py-4 font-medium text-boutique-charcoal">
                        <Link href={`/dashboard/employees/${emp.id}`} className="hover:underline text-boutique-indigo font-semibold">
                          {emp.name}

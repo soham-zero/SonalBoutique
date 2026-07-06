@@ -44,3 +44,67 @@ export async function GET(request: Request, { params }: { params: { id: string }
   })
 }
 
+export async function PATCH(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const { password, name, phone } = await request.json()
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (password !== 'Sonal@2026') {
+      return NextResponse.json({ error: 'Incorrect password' }, { status: 401 })
+    }
+
+    const updatePayload: Record<string, any> = {}
+    if (name !== undefined && typeof name === 'string' && name.trim().length > 0) {
+      updatePayload.name = name.trim()
+    }
+    if (phone !== undefined && typeof phone === 'string') {
+      const trimmedPhone = phone.trim()
+      const phoneRegex = /^[0-9]{10}$/
+      if (!phoneRegex.test(trimmedPhone)) {
+        return NextResponse.json({ error: 'Phone must be exactly 10 digits.' }, { status: 400 })
+      }
+      updatePayload.phone = trimmedPhone
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
+    }
+
+    const { error } = await (supabase.from('customers') as any).update(updatePayload).eq('id', params.id)
+    if (error) throw new Error(error.message)
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  try {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Check if transactions exist
+    const { data: txs, error: txsErr } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('customer_id', params.id)
+    if (txsErr) throw new Error(txsErr.message)
+
+    if (txs && txs.length > 0) {
+      return NextResponse.json({ error: 'Deletion not allowed: Transactions exist for this customer.' }, { status: 400 })
+    }
+
+    // Delete customer
+    const { error: delErr } = await (supabase.from('customers') as any).delete().eq('id', params.id)
+    if (delErr) throw new Error(delErr.message)
+
+    return NextResponse.json({ success: true })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+

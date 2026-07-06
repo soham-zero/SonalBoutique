@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { Search, Eye } from 'lucide-react'
+import { Search, Eye, Trash2 } from 'lucide-react'
 
 type Customer = { 
   id: string
@@ -69,6 +69,20 @@ export default function CustomersPage() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     fetchCustomers(search, false, onlyOutstanding)
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this customer?")) return
+    try {
+      const res = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete customer')
+      }
+      fetchCustomers(search, false, onlyOutstanding)
+    } catch (e: any) {
+      alert(e.message)
+    }
   }
 
   return (
@@ -143,13 +157,22 @@ export default function CustomersPage() {
                     <td className={`px-6 py-4 text-right font-bold font-mono ${c.balance > 0 ? 'text-red-500' : 'text-green-700'}`}>
                       ₹{c.balance.toFixed(2)}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-6 py-4 text-center flex items-center justify-center gap-1.5">
                       <Link href={`/dashboard/customers/${c.id}`}>
                         <Button variant="ghost" size="sm" className="text-boutique-charcoalLight hover:text-boutique-indigo gap-1">
                           <Eye className="w-4 h-4" />
                           View Ledger
                         </Button>
                       </Link>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => handleDelete(c.id)}
+                        className="text-red-500 hover:text-red-700 hover:bg-red-50 gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        Delete
+                      </Button>
                     </td>
                   </tr>
                 ))}

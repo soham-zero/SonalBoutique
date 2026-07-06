@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { recalculateCustomer } from '@/utils/billing'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
 
   let dbQuery = supabase
     .from('transactions')
-    .select('*, customers(name, phone)')
+    .select('*, customers(name, phone)', { count: 'exact' })
     .order('date_time', { ascending: false })
 
   if (query) {
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
     }
   }
 
-  const { data, error } = await dbQuery.range(offset, offset + limit - 1)
+  const { data, error, count } = await dbQuery.range(offset, offset + limit - 1)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // Map to historical structure to avoid breaking frontends
@@ -62,10 +63,11 @@ export async function GET(request: Request) {
     payment_mode: tx.payment_mode,
     total_amount: Number(tx.total_amount),
     amount_paid: Number(tx.amount_paid),
-    date_time: tx.date_time
+    date_time: tx.date_time,
+    status: tx.status
   }))
 
-  return NextResponse.json({ transactions })
+  return NextResponse.json({ transactions, total_count: count })
 }
 
 export async function POST(request: Request) {
@@ -78,13 +80,14 @@ export async function POST(request: Request) {
   const inventoryUpdates: { id: string; quantityToRestore: number }[] = []
   const inventoryLedgerIds: string[] = []
   let bishiMemberUpdatedData: { id: string; total_redeemed: number; balance: number } | null = null
+  let originalStatusToRestore: { id: string; status: string } | null = null
 
   try {
     const payload = await request.json()
     
     const {
       bill_items = [], // { inventory_id, quantity, is_bishi }[]
-      job_items = [],  // { name, description, charge, cloth_provided_by, due_date }[]
+      job_items = [],  // { name, description, charge, cloth_provided_by, due_date, original_id }[]
       payment_mode,
       amount_paid,
       customer_name,
@@ -92,7 +95,9 @@ export async function POST(request: Request) {
       bishi_id,
       bishi_member_id,
       bill_date_time,
-      bill_number: manualBillNumber
+      bill_number: manualBillNumber,
+      original_transaction_id,
+      revision_reason
     } = payload
 
     if (!bill_items.length && !job_items.length) {
@@ -202,6 +207,82 @@ export async function POST(request: Request) {
       }
     }
 
+    // Step 2.5: Handle Revision pre-creation tasks (inventory & Bishi restoration)
+    let originalJobItems: any[] = []
+    if (original_transaction_id) {
+      // Revert original Bishi redemption if it existed
+      const { data: oldSales } = await adminClient.from('bishi_sales').select('*').eq('transaction_id', original_transaction_id).single()
+      if (oldSales) {
+        const sale = oldSales as any
+        const { data: member } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', sale.bishi_member_id).single()
+        if (member) {
+          await (adminClient.from('bishi_members') as any).update({
+            total_redeemed: Number((member as any).total_redeemed) - Number(sale.redeemed),
+            balance: Number((member as any).balance) + Number(sale.redeemed)
+          }).eq('id', sale.bishi_member_id)
+        }
+        await (adminClient.from('bishi_sales') as any).delete().eq('transaction_id', original_transaction_id)
+      }
+
+      // Revert original Bishi bill items
+      const { data: oldBillItems } = await adminClient.from('bill_items').select('id').eq('transaction_id', original_transaction_id)
+      if (oldBillItems && oldBillItems.length > 0) {
+        const oldBiIds = oldBillItems.map((bi: any) => bi.id)
+        await (adminClient.from('bishi_bill_items') as any).delete().in('bill_item_id', oldBiIds)
+      }
+
+      // Restore original stock
+      const { data: rawOldBi } = await adminClient.from('bill_items').select('*').eq('transaction_id', original_transaction_id)
+      const oldBi = rawOldBi as any[] | null
+      for (const bi of oldBi || []) {
+        const { data: inv } = await adminClient.from('inventory').select('current_quantity').eq('id', bi.inventory_id).single()
+        const currentQty = inv ? Number((inv as any).current_quantity) : 0
+        await (adminClient.from('inventory') as any).update({ current_quantity: currentQty + bi.quantity }).eq('id', bi.inventory_id)
+        await (adminClient.from('inventory_ledger') as any).insert({
+          inventory_id: bi.inventory_id,
+          quantity_added: bi.quantity,
+          cost_price: bi.price_sold_at,
+          date_time: new Date().toISOString()
+        })
+      }
+
+      // Fetch original job items to compare and match status/cancel
+      const { data: oldJobs } = await adminClient.from('job_items').select('*').eq('transaction_id', original_transaction_id)
+      originalJobItems = (oldJobs as any[]) || []
+
+      // Cancel removed job items
+      for (const oldJob of originalJobItems) {
+        const isRetained = job_items.some((nj: any) => nj.original_id === oldJob.id)
+        if (!isRetained && oldJob.status !== 'cancelled') {
+          await (adminClient.from('job_items') as any).update({ status: 'cancelled' }).eq('id', oldJob.id)
+          
+          let fallbackEmployeeId: string | null = null
+          const { data: employees } = await adminClient.from('employees').select('id').limit(1)
+          if (employees && employees.length > 0) {
+            fallbackEmployeeId = (employees[0] as any).id
+          }
+          const empId = oldJob.employee_id || fallbackEmployeeId
+          if (empId) {
+            await (adminClient.from('job_item_ledger') as any).insert({
+              job_item_id: oldJob.id,
+              employee_id: empId,
+              work: 'cancelled',
+              changed_at: new Date().toISOString()
+            })
+          }
+        }
+      }
+
+      // Track old status for rollback
+      const { data: oldTxDetails } = await adminClient.from('transactions').select('status').eq('id', original_transaction_id).single()
+      if (oldTxDetails) {
+        originalStatusToRestore = { id: original_transaction_id, status: (oldTxDetails as any).status }
+      }
+
+      // Mark original transaction status as REVISED
+      await (adminClient.from('transactions') as any).update({ status: 'REVISED' }).eq('id', original_transaction_id)
+    }
+
     // Step 3: Pre-calculate bill items
     let total_amount = 0
     let discount_amount = Number(payload.discount_amount || 0)
@@ -250,7 +331,8 @@ export async function POST(request: Request) {
         total_amount: finalNetTotal,
         discount_amount,
         amount_paid: Number(amount_paid),
-        date_time: billDateTime
+        date_time: billDateTime,
+        status: 'ACTIVE'
       })
       .select('id')
       .single()
@@ -258,6 +340,16 @@ export async function POST(request: Request) {
     if (txError) throw new Error('Failed to create transaction: ' + txError.message)
 
     createdTransactionId = (transaction as any).id
+
+    // Write to revisions table if this is a revision
+    if (original_transaction_id) {
+      const { error: revErr } = await (adminClient.from('revisions') as any).insert({
+        original_transaction_id,
+        revised_transaction_id: createdTransactionId,
+        reason: revision_reason || 'Revised'
+      })
+      if (revErr) throw new Error('Failed to create revisions mapping: ' + revErr.message)
+    }
 
     // Step 5: Insert Bill Items & update inventory sequentially
     for (const item of enriched_bill_items) {
@@ -281,19 +373,6 @@ export async function POST(request: Request) {
       const { error: invUpdErr } = await (adminClient.from('inventory') as any).update({ current_quantity: newQty }).eq('id', item.inventory_id)
       if (invUpdErr) throw new Error("Failed to update inventory: " + invUpdErr.message)
 
-      // Inventory ledger
-      const { data: ledgerData, error: ledgerErr } = await (adminClient.from('inventory_ledger') as any).insert({
-        inventory_id: item.inventory_id,
-        quantity_added: -item.quantity,
-        cost_price: item.price_sold_at,
-        date_time: billDateTime
-      }).select('id').single()
-      if (ledgerErr) throw new Error("Failed to insert inventory ledger: " + ledgerErr.message)
-      
-      if (ledgerData) {
-        inventoryLedgerIds.push((ledgerData as any).id)
-      }
-
       // Bishi check for bill items
       if (item.is_bishi && bishi_id && bishi_member_id) {
         const { error: bbiErr } = await (adminClient.from('bishi_bill_items') as any).insert({
@@ -309,19 +388,36 @@ export async function POST(request: Request) {
     for (const job of job_items) {
       const q = Number(job.quantity || 1)
       const amt = Number(job.amount) || (q * Number(job.charge))
-      const { error: jobErr } = await (adminClient.from('job_items') as any).insert({
+      
+      let jobStatus = 'ordered'
+      if (job.original_id) {
+        const matchedOld = originalJobItems.find(o => o.id === job.original_id)
+        if (matchedOld) {
+          jobStatus = matchedOld.status
+        }
+      }
+
+      const { data: newJob, error: jobErr } = await (adminClient.from('job_items') as any).insert({
         transaction_id: createdTransactionId,
         name: job.name,
         description: job.description || null,
         charge: job.charge,
         cloth_provided_by: job.cloth_provided_by,
         due_date: job.due_date || null,
-        status: 'ordered',
+        status: jobStatus,
         quantity: q,
         amount: amt
-      })
+      }).select().single()
 
       if (jobErr) throw new Error('Failed to create job item: ' + jobErr.message)
+
+      if (newJob && job.original_id) {
+        // Move ledger entries from old job item to new job item
+        const { error: ledgerMoveErr } = await (adminClient.from('job_item_ledger') as any)
+          .update({ job_item_id: (newJob as any).id })
+          .eq('job_item_id', job.original_id)
+        if (ledgerMoveErr) throw new Error('Failed to carry over job ledger: ' + ledgerMoveErr.message)
+      }
     }
 
     // Step 7: Bishi Sales records
@@ -355,10 +451,25 @@ export async function POST(request: Request) {
       }
     }
 
+    // Step 8: Recalculate customer billing total
+    if (customerId) {
+      await recalculateCustomer(customerId, adminClient)
+    }
+
     return NextResponse.json({ success: true, transaction_id: createdTransactionId })
 
   } catch (err: any) {
     console.error("Billing transaction error. Starting rollback...", err)
+
+    if (originalStatusToRestore) {
+      try {
+        await (adminClient.from('transactions') as any)
+          .update({ status: originalStatusToRestore.status })
+          .eq('id', originalStatusToRestore.id)
+      } catch (e) {
+        console.error("Rollback of original transaction status failed:", e)
+      }
+    }
 
     // Rollback DB Changes in reverse order
     // Rollback DB Changes in reverse order with isolated try-catch blocks

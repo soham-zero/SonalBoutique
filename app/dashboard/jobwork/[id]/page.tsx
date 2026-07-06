@@ -90,7 +90,7 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
   if (!job) return <div className="p-8 text-center text-red-500">Job not found.</div>
 
   const currentStageIndex = STAGE_ORDER.indexOf(job.status)
-  const nextStage = STAGE_ORDER[currentStageIndex + 1]
+  const nextStage = job.status === 'cancelled' ? undefined : STAGE_ORDER[currentStageIndex + 1]
 
   const handleUpdateStatus = async () => {
     if (!nextStage) return
@@ -263,6 +263,10 @@ export default function JobWorkDetail({ params }: { params: { id: string } }) {
                 {updating ? 'Updating...' : `Advance to ${nextStage}`}
               </Button>
             </div>
+          ) : job.status === 'cancelled' ? (
+             <div className="p-4 bg-red-50 rounded border border-red-200 text-red-700 font-medium">
+               This job has been cancelled.
+             </div>
           ) : (
              <div className="p-4 bg-green-50 rounded border border-green-200 text-green-700 font-medium">
                This job has been fully delivered.
