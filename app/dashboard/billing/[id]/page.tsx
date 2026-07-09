@@ -273,8 +273,8 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
             <div>
               <h1 className="font-serif text-3xl font-bold text-boutique-roseDark leading-tight">Sonal Boutique</h1>
               <p className="text-xs text-boutique-charcoalLight mt-1.5 leading-relaxed">
-                123 Boutique Street, Nagpur<br />
-                Tel: +91 9876543210
+                110, Nandanvan Layout, Nagpur<br />
+                Mob: +91 9579967798
               </p>
             </div>
             <div className="text-right">

@@ -6,7 +6,7 @@ import { PageHeader } from '@/components/ui/PageHeader'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
 import { format, isBefore, startOfDay } from 'date-fns'
-import { Search, Eye, AlertTriangle } from 'lucide-react'
+import { Search, Eye, AlertTriangle, FileText } from 'lucide-react'
 import { InventoryTab } from './InventoryTab'
 
 const ACTIVE_STATUSES = ['ordered', 'preparation', 'cutting', 'stitching', 'finishing', 'ironing']
@@ -18,6 +18,7 @@ type JobItem = {
   due_date: string | null
   cloth_provided_by: string
   charge: number
+  amount?: number | null
   transactions?: {
     id: string
     bill_number: string
@@ -53,6 +54,78 @@ export default function JobWorkPage() {
   const [cancellingIds, setCancellingIds] = useState<Record<string, boolean>>({})
 
   const LIMIT = 10
+
+  const [worksheetStartDate, setWorksheetStartDate] = useState('')
+  const [worksheetEndDate, setWorksheetEndDate] = useState('')
+  const [worksheetJobs, setWorksheetJobs] = useState<JobItem[]>([])
+  const [loadingWorksheet, setLoadingWorksheet] = useState(false)
+
+  const handleLoadWorksheet = async () => {
+    if (!worksheetStartDate || !worksheetEndDate) {
+      alert("Please select both Start Date and End Date.")
+      return
+    }
+    setLoadingWorksheet(true)
+    try {
+      const params = new URLSearchParams({
+        start_date: worksheetStartDate,
+        end_date: worksheetEndDate,
+        group: 'active',
+        limit: '1000'
+      })
+      const res = await fetch(`/api/billing/jobwork?${params.toString()}`)
+      if (res.ok) {
+        const d = await res.json()
+        setWorksheetJobs(d.jobs || [])
+        if ((d.jobs || []).length === 0) {
+          alert("No active jobs found within the selected date range.")
+        }
+      } else {
+        alert("Failed to load worksheet jobs.")
+      }
+    } catch (e) {
+      console.error(e)
+      alert("An error occurred while loading jobs.")
+    } finally {
+      setLoadingWorksheet(false)
+    }
+  }
+
+  const handlePrintWorksheet = () => {
+    if (worksheetJobs.length === 0) {
+      alert("Please load jobs first.")
+      return
+    }
+    window.print()
+  }
+
+  const sortedWorksheetJobs = React.useMemo(() => {
+    const txCounts: Record<string, number> = {}
+    const jobsWithItemNum = worksheetJobs.map(job => {
+      const txId = job.transactions?.id || 'none'
+      if (txCounts[txId] === undefined) {
+        txCounts[txId] = 0
+      }
+      txCounts[txId] += 1
+      return { ...job, item_number: txCounts[txId] }
+    })
+
+    return jobsWithItemNum.sort((a, b) => {
+      if (!a.due_date && b.due_date) return 1
+      if (a.due_date && !b.due_date) return -1
+      if (!a.due_date && !b.due_date) return 0
+      
+      const dateA = new Date(a.due_date!).getTime()
+      const dateB = new Date(b.due_date!).getTime()
+      if (dateA !== dateB) return dateA - dateB
+
+      const billA = parseInt(a.transactions?.bill_number || '0', 10)
+      const billB = parseInt(b.transactions?.bill_number || '0', 10)
+      if (billA !== billB) return billA - billB
+
+      return (a.item_number || 0) - (b.item_number || 0)
+    })
+  }, [worksheetJobs])
 
   const sortedJobs = React.useMemo(() => {
     // assign temporary relative item numbers for sorting among items with identical bill numbers
@@ -208,7 +281,8 @@ export default function JobWorkPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-20">
+    <>
+      <div className="space-y-6 max-w-7xl mx-auto pb-20 no-print">
       <PageHeader 
         title="Job Work Management" 
         description="Track custom tailoring, updates, status cycles, and material audits."
@@ -284,6 +358,55 @@ export default function JobWorkPage() {
             </span>
           </div>
 
+          {/* Tailor Worksheet Section */}
+          <div className="bg-white rounded-2xl shadow-soft border border-boutique-border p-5">
+            <h3 className="section-title text-base font-serif mb-4">Tailor Worksheet</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
+              <div>
+                <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-1.5">
+                  Start Date
+                </label>
+                <Input
+                  type="date"
+                  value={worksheetStartDate}
+                  onChange={e => setWorksheetStartDate(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-boutique-charcoalLight uppercase tracking-wider mb-1.5">
+                  End Date
+                </label>
+                <Input
+                  type="date"
+                  value={worksheetEndDate}
+                  onChange={e => setWorksheetEndDate(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2 col-span-1 sm:col-span-2 md:col-span-2">
+                <Button
+                  onClick={handleLoadWorksheet}
+                  disabled={loadingWorksheet}
+                  className="flex-1"
+                >
+                  {loadingWorksheet ? 'Loading...' : 'Load Jobs'}
+                </Button>
+                <Button
+                  onClick={handlePrintWorksheet}
+                  disabled={worksheetJobs.length === 0}
+                  variant="outline"
+                  className="flex-1 bg-boutique-indigo text-white hover:bg-boutique-indigo/90 hover:text-white border-transparent"
+                >
+                  Print Worksheet
+                </Button>
+              </div>
+            </div>
+            {worksheetJobs.length > 0 && (
+              <p className="text-xs text-boutique-emerald font-semibold mt-3">
+                ✓ Loaded {worksheetJobs.length} active jobs for the worksheet. Click "Print Worksheet" to print them.
+              </p>
+            )}
+          </div>
+
           {/* Table */}
           <div className="bg-white rounded-2xl shadow-soft border border-boutique-border overflow-hidden">
             <div className="overflow-x-auto">
@@ -302,7 +425,7 @@ export default function JobWorkPage() {
                       <th className="px-6 py-3.5">Status</th>
                       <th className="px-6 py-3.5">Due Date</th>
                       <th className="px-6 py-3.5">Cloth By</th>
-                      <th className="px-6 py-3.5 text-right">Charge</th>
+                      <th className="px-6 py-3.5 text-right">Amount</th>
                       <th className="px-6 py-3.5 text-center">Action</th>
                     </tr>
                   </thead>
@@ -363,27 +486,31 @@ export default function JobWorkPage() {
                                 ) : <span className="text-boutique-charcoalLight">—</span>}
                               </td>
                               <td className="px-6 py-4 capitalize text-boutique-charcoalLight text-xs">{job.cloth_provided_by}</td>
-                              <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">₹{job.charge.toFixed(2)}</td>
+                              <td className="px-6 py-4 text-right font-medium text-boutique-charcoal">₹{(job.amount ?? job.charge).toFixed(2)}</td>
                               <td className="px-6 py-4">
                                 <div className="flex items-center justify-center gap-2">
                                   {activeTab === 'active' && (
-                                    <div className="flex flex-wrap items-center justify-center gap-2">
+                                    <div className="flex flex-wrap items-center justify-center gap-1.5 md:gap-2">
+                                      <Link href={`/dashboard/jobwork/${job.id}/spec`}>
+                                        <Button size="sm" variant="outline" className="gap-1 border-boutique-indigo text-boutique-indigo hover:bg-boutique-indigo/5">
+                                          <FileText className="w-3.5 h-3.5" />
+                                          Specs
+                                        </Button>
+                                      </Link>
                                       <Link href={`/dashboard/jobwork/${job.id}`}>
                                         <Button size="sm" variant="outline" className="gap-1">
                                           <Eye className="w-3.5 h-3.5" />
                                           Update
                                         </Button>
                                       </Link>
-                                      <div className="flex items-center gap-1.5 px-2 py-1">
-                                        <Button 
-                                          size="sm" 
-                                          variant="danger"
-                                          onClick={() => handleCancelJob(job.id)}
-                                          disabled={cancellingIds[job.id]}
-                                        >
-                                          {cancellingIds[job.id] ? 'Cancelling...' : 'Cancel'}
-                                        </Button>
-                                      </div>
+                                      <Button 
+                                        size="sm" 
+                                        variant="danger"
+                                        onClick={() => handleCancelJob(job.id)}
+                                        disabled={cancellingIds[job.id]}
+                                      >
+                                        {cancellingIds[job.id] ? 'Cancelling...' : 'Cancel'}
+                                      </Button>
                                     </div>
                                   )}
 
@@ -479,6 +606,91 @@ export default function JobWorkPage() {
           <InventoryTab />
         </div>
       )}
-    </div>
+      </div>
+
+      {/* ── Print Styles ─────────────────────────────────────────────── */}
+      <style>{`
+        @media print {
+          @page { margin: 1.5cm; }
+          body { background: white !important; color: black !important; }
+          .no-print, aside, header, nav, footer, button, .print-hidden { display: none !important; }
+          .print-area { display: block !important; width: 100% !important; }
+        }
+      `}</style>
+
+      {/* Printable Worksheet (Hidden on screen, visible on print) */}
+      <div className="hidden print:block print-area">
+        <div className="mb-6">
+          <h1 className="font-serif text-2xl font-bold text-boutique-charcoal">Sonal Boutique</h1>
+          <p className="text-sm font-semibold uppercase tracking-wider text-boutique-charcoalLight mt-1">
+            Tailor Worksheet
+          </p>
+          {worksheetStartDate && worksheetEndDate && (
+            <p className="text-xs text-boutique-charcoalLight">
+              Due Date Range: {format(new Date(worksheetStartDate), 'dd MMM yyyy')} to {format(new Date(worksheetEndDate), 'dd MMM yyyy')}
+            </p>
+          )}
+        </div>
+
+        <div className="border border-boutique-border rounded-xl overflow-hidden bg-white text-sm">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-boutique-creamDark/60 font-semibold uppercase tracking-wider text-boutique-charcoalLight border-b border-boutique-border">
+              <tr>
+                <th className="px-4 py-2.5">Bill #</th>
+                <th className="px-4 py-2.5">Job Name</th>
+                <th className="px-4 py-2.5">Customer</th>
+                <th className="px-4 py-2.5">Status</th>
+                <th className="px-4 py-2.5">Due Date</th>
+                <th className="px-4 py-2.5">Cloth By</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-boutique-border">
+              {(() => {
+                let lastDueDate: string | null | undefined = undefined
+                return sortedWorksheetJobs.map((job) => {
+                  const showHeader = job.due_date !== lastDueDate
+                  if (showHeader) {
+                    lastDueDate = job.due_date
+                  }
+
+                  return (
+                    <React.Fragment key={job.id}>
+                      {showHeader && (
+                        <tr className="bg-boutique-creamDark/40 border-y border-boutique-border">
+                          <td colSpan={6} className="px-4 py-2 font-semibold text-boutique-charcoal text-xs uppercase tracking-wider">
+                            Due Date: {job.due_date ? format(new Date(job.due_date), 'dd MMM yyyy') : 'No Due Date'}
+                          </td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td className="px-4 py-3 font-mono">
+                          {job.transactions?.bill_number ? `#${job.transactions.bill_number}` : 'N/A'}
+                        </td>
+                        <td className="px-4 py-3 font-semibold text-boutique-charcoal">
+                          {job.name}
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-boutique-charcoal">
+                            {job.transactions?.customers?.name || 'Walk-in'}
+                          </div>
+                          {job.transactions?.customers?.phone && (
+                            <div className="text-[10px] text-boutique-charcoalLight">{job.transactions.customers.phone}</div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 capitalize">{job.status}</td>
+                        <td className="px-4 py-3">
+                          {job.due_date ? format(new Date(job.due_date), 'dd MMM yy') : '—'}
+                        </td>
+                        <td className="px-4 py-3 capitalize text-boutique-charcoalLight">{job.cloth_provided_by}</td>
+                      </tr>
+                    </React.Fragment>
+                  )
+                })
+              })()}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
   )
 }

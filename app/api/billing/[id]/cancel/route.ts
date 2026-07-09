@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { recalculateCustomer } from '@/utils/billing'
+import { cleanupJobSpec } from '@/utils/jobSpecs'
 
 export async function POST(request: Request, { params }: { params: { id: string } }) {
   const transactionId = params.id
@@ -92,6 +93,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
             .update({ status: 'cancelled' })
             .eq('id', job.id)
           if (jobErr) throw new Error(`Failed to cancel job item ${job.id}: ` + jobErr.message)
+
+          // Run cleanup independently
+          cleanupJobSpec(job.id)
 
           // Write to job_item_ledger
           const empId = job.employee_id || fallbackEmployeeId

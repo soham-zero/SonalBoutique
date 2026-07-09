@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
 import { recalculateCustomer } from '@/utils/billing'
+import { cleanupJobSpec } from '@/utils/jobSpecs'
 
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const transactionId = params.id
@@ -84,7 +85,12 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       await (adminClient.from('job_item_ledger') as any).delete().in('job_item_id', jobItemIds)
     }
 
-    // D. Delete job_items
+    // D. Clean up job specs & files from storage
+    for (const job of jobItems || []) {
+      cleanupJobSpec(job.id)
+    }
+
+    // E. Delete job_items
     await (adminClient.from('job_items') as any).delete().eq('transaction_id', transactionId)
 
     // E. Delete bill_items

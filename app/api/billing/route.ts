@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { recalculateCustomer } from '@/utils/billing'
+import { cleanupJobSpec } from '@/utils/jobSpecs'
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
@@ -255,6 +256,7 @@ export async function POST(request: Request) {
         const isRetained = job_items.some((nj: any) => nj.original_id === oldJob.id)
         if (!isRetained && oldJob.status !== 'cancelled') {
           await (adminClient.from('job_items') as any).update({ status: 'cancelled' }).eq('id', oldJob.id)
+          cleanupJobSpec(oldJob.id)
           
           let fallbackEmployeeId: string | null = null
           const { data: employees } = await adminClient.from('employees').select('id').limit(1)

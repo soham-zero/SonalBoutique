@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
+import { cleanupJobSpec } from '@/utils/jobSpecs'
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
@@ -65,6 +66,10 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       })
 
     if (ledgerErr) throw new Error(ledgerErr.message)
+
+    if (next_status === 'complete' || next_status === 'delivered' || next_status === 'cancelled') {
+      cleanupJobSpec(params.id)
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

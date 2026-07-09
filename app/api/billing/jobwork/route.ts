@@ -10,6 +10,8 @@ export async function GET(request: Request) {
   const q = searchParams.get('q') || ''
   const limit = Number(searchParams.get('limit')) || 10
   const offset = Number(searchParams.get('offset')) || 0
+  const start_date = searchParams.get('start_date')
+  const end_date = searchParams.get('end_date')
 
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -25,6 +27,13 @@ export async function GET(request: Request) {
       )
     `, { count: 'exact' })
     .eq('transactions.status', 'ACTIVE')
+  
+  if (start_date) {
+    dbQuery = dbQuery.gte('due_date', start_date)
+  }
+  if (end_date) {
+    dbQuery = dbQuery.lte('due_date', end_date)
+  }
 
   // Status group filter
   if (group === 'active') {
