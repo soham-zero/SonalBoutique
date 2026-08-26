@@ -5,8 +5,8 @@ const ACTIVE_STATUSES = ['ordered', 'preparation', 'cutting', 'stitching', 'fini
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const statusFilter = searchParams.get('status') // single status or 'complete' or 'delivered'
-  const group = searchParams.get('group') || 'active' // 'active' | 'completed' | 'delivered'
+  const statusFilter = searchParams.get('status')
+  const group = searchParams.get('group') || 'active'
   const q = searchParams.get('q') || ''
   const limit = Number(searchParams.get('limit')) || 10
   const offset = Number(searchParams.get('offset')) || 0
@@ -17,6 +17,28 @@ export async function GET(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // --- Multi-field search: resolve matching transaction IDs from customers & bill numbers ---
+  let matchingTxIds: string[] | null = null
+  if (q) {
+    // 1. Find customer IDs matching name or phone
+    const { data: matchingCustomers } = await supabase
+      .from('customers')
+      .select('id')
+      .or(`name.ilike.${q}%,phone.ilike.${q}%`)
+
+    const customerIds = (matchingCustomers || []).map((c: any) => c.id)
+
+    // 2. Find transaction IDs matching bill_number OR those customers
+    let txQuery = supabase.from('transactions').select('id') as any
+    if (customerIds.length > 0) {
+      txQuery = txQuery.or(`bill_number.ilike.${q}%,customer_id.in.(${customerIds.map((id: string) => `"${id}"`).join(',')})`)
+    } else {
+      txQuery = txQuery.ilike('bill_number', `${q}%`)
+    }
+    const { data: matchingTx } = await txQuery
+    matchingTxIds = (matchingTx || []).map((t: any) => t.id)
+  }
+
   let dbQuery = supabase
     .from('job_items')
     .select(`
@@ -26,14 +48,10 @@ export async function GET(request: Request) {
         customers ( name, phone )
       )
     `, { count: 'exact' })
-    .eq('transactions.status', 'ACTIVE')
-  
-  if (start_date) {
-    dbQuery = dbQuery.gte('due_date', start_date)
-  }
-  if (end_date) {
-    dbQuery = dbQuery.lte('due_date', end_date)
-  }
+    .eq('transactions.status', 'ACTIVE') as any
+
+  if (start_date) dbQuery = dbQuery.gte('due_date', start_date)
+  if (end_date) dbQuery = dbQuery.lte('due_date', end_date)
 
   // Status group filter
   if (group === 'active') {
@@ -51,9 +69,14 @@ export async function GET(request: Request) {
     dbQuery = dbQuery.eq('status', statusFilter)
   }
 
-  // Search by job name
+  // Search filter: job name OR matched transaction IDs
   if (q) {
-    dbQuery = dbQuery.ilike('name', `${q}%`)
+    if (matchingTxIds && matchingTxIds.length > 0) {
+      dbQuery = dbQuery.or(`name.ilike.${q}%,transaction_id.in.(${matchingTxIds.map((id: string) => `"${id}"`).join(',')})`)
+    } else {
+      // No customer/bill matches found — search job name only
+      dbQuery = dbQuery.ilike('name', `${q}%`)
+    }
   }
 
   dbQuery = dbQuery
@@ -65,4 +88,3 @@ export async function GET(request: Request) {
 
   return NextResponse.json({ jobs: data || [], count: count || 0 })
 }
-

@@ -9,11 +9,11 @@ import { CalendarClock, ChevronDown, ChevronUp, Search, Plus, Trash2, User, Phon
 
 // Types
 type InventoryItem = { id: string; name: string; custom_code: string; selling_price: number; current_quantity: number }
-type BillItem = { tempId: number; inventory_id: string; name: string; quantity: number; price_sold_at: number; amount: number; is_bishi: boolean }
-type JobItem = { tempId: number; name: string; description: string; charge: number; quantity: number; amount: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string; original_id?: string; status?: string }
+type BillItem = { tempId: number; inventory_id: string; name: string; quantity: string | number; price_sold_at: string | number; amount: number; is_bishi: boolean }
+type JobItem = { tempId: number; name: string; description: string; charge: string | number; quantity: string | number; amount: number; cloth_provided_by: 'customer' | 'boutique'; due_date: string; original_id?: string; status?: string }
 type BishiGroup = { id: string; name: string }
 type BishiMember = { id: string; name: string }
-type Customer = { id: string; name: string; phone: string; balance: number }
+type Customer = { id: string; name: string; phone: string; balance: number; opening_balance: number }
 
 const getLocalDateTimeValue = () => {
   const now = new Date()
@@ -53,11 +53,13 @@ export default function NewBillPage() {
   const [billItems, setBillItems] = useState<BillItem[]>([])
   const [jobItems, setJobItems] = useState<JobItem[]>([])
   const [paymentMode, setPaymentMode] = useState<'cash'|'upi'|'split'|'credit'|'debit'>('cash')
-  const [amountPaid, setAmountPaid] = useState<number | ''>('')
+  const [amountPaid, setAmountPaid] = useState<number | string>(0)
   const [customerName, setCustomerName] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
+  const [customerOpeningBalance, setCustomerOpeningBalance] = useState<string>('0')
   const [billDateTime, setBillDateTime] = useState('')
-  const [discountAmount, setDiscountAmount] = useState<number>(0)
+  const [discountAmount, setDiscountAmount] = useState<number | string>(0)
+  const [universalDueDate, setUniversalDueDate] = useState('')
   
   // Bishi Toggle
   const [isBishiSale, setIsBishiSale] = useState(false)
@@ -127,7 +129,7 @@ export default function NewBillPage() {
             setOriginalTransactionId(tx.id)
             setOriginalBillNumber(tx.bill_number)
             setPaymentMode(tx.payment_mode)
-            setAmountPaid(Number(tx.amount_paid) || '')
+            setAmountPaid(Number(tx.amount_paid) || 0)
             setDiscountAmount(Number(tx.discount_amount) || 0)
 
             if (tx.customers) {
@@ -135,10 +137,12 @@ export default function NewBillPage() {
                 id: tx.customer_id,
                 name: tx.customers.name,
                 phone: tx.customers.phone,
-                balance: Number(tx.customers.balance)
+                balance: Number(tx.customers.balance),
+                opening_balance: Number(tx.customers.opening_balance || 0)
               })
               setCustomerName(tx.customers.name)
               setCustomerPhone(tx.customers.phone)
+              setCustomerOpeningBalance(String(Number(tx.customers.opening_balance || 0)))
               setCustomerSearch(`${tx.customers.name} (${tx.customers.phone})`)
             }
 
@@ -245,7 +249,7 @@ export default function NewBillPage() {
     return calcBillItemsSubtotal() + calcJobworkSubtotal()
   }
 
-  const grandTotal = calcTotalAmount() - discountAmount
+  const grandTotal = calcTotalAmount() - (Number(discountAmount) || 0)
   const dueAmount = grandTotal - (Number(amountPaid) || 0)
 
   // Bill Items Handlers
@@ -270,7 +274,7 @@ export default function NewBillPage() {
     setBillItems(prev => prev.map(item => {
       if (item.tempId === tempId) {
         const updated = { ...item, [field]: val }
-        updated.amount = updated.quantity * updated.price_sold_at
+        updated.amount = (parseFloat(String(updated.quantity)) || 0) * (parseFloat(String(updated.price_sold_at)) || 0)
         return updated
       }
       return item
@@ -294,7 +298,7 @@ export default function NewBillPage() {
       quantity: 1,
       amount: 0,
       cloth_provided_by: 'customer',
-      due_date: defaultDueDate.toISOString().split('T')[0]
+      due_date: universalDueDate || defaultDueDate.toISOString().split('T')[0]
     }])
   }
 
@@ -302,7 +306,7 @@ export default function NewBillPage() {
     setJobItems(prev => prev.map(item => {
       if (item.tempId === tempId) {
         const updated = { ...item, [field]: val }
-        updated.amount = (updated.quantity || 1) * (updated.charge || 0)
+        updated.amount = (parseFloat(String(updated.quantity)) || 0) * (parseFloat(String(updated.charge)) || 0)
         return updated
       }
       return item
@@ -313,11 +317,21 @@ export default function NewBillPage() {
     setJobItems(prev => prev.filter(i => i.tempId !== tempId))
   }
 
+  const handleUniversalDueDateChange = (e: any) => {
+    const newDate = e.target.value
+    setUniversalDueDate(newDate)
+    setJobItems(prev => prev.map(item => ({
+      ...item,
+      due_date: newDate
+    })))
+  }
+
   // Customer selection
   const handleSelectCustomer = (cust: Customer) => {
     setSelectedCustomer(cust)
     setCustomerName(cust.name)
     setCustomerPhone(cust.phone)
+    setCustomerOpeningBalance(String(cust.opening_balance || 0))
     setCustomerSearch(`${cust.name} (${cust.phone})`)
     setShowCustDropdown(false)
   }
@@ -326,12 +340,48 @@ export default function NewBillPage() {
     setSelectedCustomer(null)
     setCustomerName('')
     setCustomerPhone('')
+    setCustomerOpeningBalance('0')
     setCustomerSearch('')
   }
 
   const handleSubmit = async () => {
     setError(null)
     
+    const isInteger = (val: any) => /^\d+$/.test(String(val).trim());
+    const isNumber = (val: any) => /^\d+(\.\d+)?$/.test(String(val).trim());
+
+    for (const item of billItems) {
+      if (!isInteger(item.quantity) || parseInt(String(item.quantity), 10) <= 0) {
+        setError(`Invalid quantity for ${item.name}. Must be a whole number greater than 0.`);
+        return;
+      }
+      if (!isNumber(item.price_sold_at)) {
+        setError(`Invalid price for ${item.name}. Must be a valid positive number.`);
+        return;
+      }
+    }
+
+    for (const job of jobItems) {
+      if (!isInteger(job.quantity) || parseInt(String(job.quantity), 10) <= 0) {
+        setError(`Invalid quantity for ${job.name || 'Job Item'}. Must be a whole number greater than 0.`);
+        return;
+      }
+      if (!isNumber(job.charge)) {
+        setError(`Invalid rate for ${job.name || 'Job Item'}. Must be a valid positive number.`);
+        return;
+      }
+    }
+
+    if (!isNumber(amountPaid)) {
+      setError("Please enter a valid numeric value for Amount Paid.");
+      return;
+    }
+    
+    if (!isNumber(discountAmount)) {
+      setError("Please enter a valid numeric value for Discount Amount.");
+      return;
+    }
+
     if (billItems.length === 0 && jobItems.length === 0) {
       setError("Please add at least one Purchase Item or Job Work.")
       return
@@ -357,11 +407,6 @@ export default function NewBillPage() {
       setError("Customer Phone must be exactly 10 digits, containing only numbers with no spaces or symbols.")
       return
     }
-    
-    if (amountPaid === '' || amountPaid < 0) {
-      setError("Please enter a valid amount paid (can be 0).")
-      return
-    }
 
     if (isBishiSale) {
       const hasAnyBishiItem = billItems.some(item => item.is_bishi)
@@ -381,25 +426,26 @@ export default function NewBillPage() {
       bill_number: billNumber,
       bill_items: billItems.map(b => ({
         inventory_id: b.inventory_id,
-        quantity: b.quantity,
-        price_sold_at: b.price_sold_at,
+        quantity: parseInt(String(b.quantity), 10),
+        price_sold_at: parseFloat(String(b.price_sold_at)),
         is_bishi: b.is_bishi
       })),
       job_items: jobItems.map(j => ({
         original_id: j.original_id,
         name: j.name || 'Jobwork Item',
         description: j.description,
-        charge: j.charge,
-        quantity: j.quantity,
+        charge: parseFloat(String(j.charge)),
+        quantity: parseInt(String(j.quantity), 10),
         amount: j.amount,
         cloth_provided_by: j.cloth_provided_by,
         due_date: j.due_date,
       })),
       payment_mode: paymentMode,
-      amount_paid: Number(amountPaid),
-      discount_amount: discountAmount,
+      amount_paid: parseFloat(String(amountPaid)),
+      discount_amount: parseFloat(String(discountAmount)),
       customer_name: customerName.trim(),
       customer_phone: customerPhone,
+      customer_opening_balance: parseFloat(customerOpeningBalance) || 0,
       bishi_id: isBishiSale ? selectedBishiGroupId : null,
       bishi_member_id: isBishiSale ? selectedBishiMemberId : null,
       bill_date_time: billDateTime,
@@ -541,7 +587,7 @@ export default function NewBillPage() {
           <User className="w-5 h-5 text-boutique-roseDark" />
           Customer Information
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Input 
             label="Customer Name" 
             placeholder="Walk-in"
@@ -556,7 +602,28 @@ export default function NewBillPage() {
             onChange={(e) => setCustomerPhone(e.target.value)}
             disabled={!!selectedCustomer}
           />
+          <div>
+            <label className="block text-sm font-medium text-boutique-charcoal mb-1">
+              Opening Balance (₹)
+              {selectedCustomer && <span className="ml-1.5 text-xs text-boutique-charcoalLight font-normal">(from customer record)</span>}
+            </label>
+            <input
+              type="text"
+              inputMode="decimal"
+              value={customerOpeningBalance}
+              onChange={(e) => setCustomerOpeningBalance(e.target.value)}
+              disabled={!!selectedCustomer}
+              placeholder="0"
+              className="flex h-10 w-full rounded-md border border-boutique-border bg-white px-3 py-2 text-sm text-boutique-charcoal focus:outline-none focus:ring-2 focus:ring-boutique-roseLight disabled:bg-boutique-cream/50 disabled:cursor-not-allowed"
+            />
+          </div>
         </div>
+        {selectedCustomer && Number(selectedCustomer.opening_balance) !== 0 && (
+          <p className="mt-3 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠️ This customer has a prior opening balance of <strong>₹{Number(selectedCustomer.opening_balance).toFixed(2)}</strong>.
+            Their total balance due today is <strong>₹{Number(selectedCustomer.balance).toFixed(2)}</strong>.
+          </p>
+        )}
       </div>
 
       {/* PURCHASE SECTION */}
@@ -635,18 +702,16 @@ export default function NewBillPage() {
                     </div>
                     <div className="col-span-2 w-full">
                       <Input 
-                        type="number" 
-                        min={1} 
-                        value={item.quantity} 
-                        onChange={(e) => updateBillItem(item.tempId, 'quantity', Number(e.target.value))}
+                        type="text" 
+                        value={String(item.quantity)} 
+                        onChange={(e) => updateBillItem(item.tempId, 'quantity', e.target.value)}
                       />
                     </div>
                     <div className="col-span-2 w-full">
                       <Input 
-                        type="number" 
-                        min={0} 
-                        value={item.price_sold_at} 
-                        onChange={(e) => updateBillItem(item.tempId, 'price_sold_at', Number(e.target.value))}
+                        type="text" 
+                        value={String(item.price_sold_at)} 
+                        onChange={(e) => updateBillItem(item.tempId, 'price_sold_at', e.target.value)}
                       />
                     </div>
                     <div className="col-span-2 w-full flex items-center justify-center">
@@ -695,10 +760,20 @@ export default function NewBillPage() {
 
         {jobworkOpen && (
           <div className="p-4 md:p-6 space-y-6">
-            <Button variant="outline" onClick={addJobItem} className="w-full md:w-auto">
-              <Plus className="w-4 h-4 mr-2" />
-              Add Job Item
-            </Button>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
+              <Button variant="outline" onClick={addJobItem} className="w-full md:w-auto">
+                <Plus className="w-4 h-4 mr-2" />
+                Add Job Item
+              </Button>
+              <div className="w-full md:w-48">
+                <Input 
+                  label="Universal Due Date"
+                  type="date"
+                  value={universalDueDate}
+                  onChange={handleUniversalDueDateChange}
+                />
+              </div>
+            </div>
 
             {jobItems.length > 0 && (
               <div className="space-y-4">
@@ -746,28 +821,26 @@ export default function NewBillPage() {
                     <div className="col-span-2 w-full">
                       <Input 
                         label="Rate (₹)" 
-                        type="number" 
-                        min={0} 
-                        value={job.charge || ''} 
-                        onChange={(e) => updateJobItem(job.tempId, 'charge', Number(e.target.value))}
+                        type="text" 
+                        value={String(job.charge)} 
+                        onChange={(e) => updateJobItem(job.tempId, 'charge', e.target.value)}
                         required
                       />
                     </div>
                     <div className="col-span-2 w-full">
                       <Input 
                         label="Qty" 
-                        type="number" 
-                        min={1} 
-                        value={job.quantity || 1} 
-                        onChange={(e) => updateJobItem(job.tempId, 'quantity', Number(e.target.value))}
+                        type="text" 
+                        value={String(job.quantity)} 
+                        onChange={(e) => updateJobItem(job.tempId, 'quantity', e.target.value)}
                         required
                       />
                     </div>
                     <div className="col-span-2 w-full">
                       <Input 
                         label="Amount (₹)" 
-                        type="number" 
-                        value={job.amount || 0}
+                        type="text" 
+                        value={String(job.amount)}
                         disabled
                         required
                       />
@@ -859,20 +932,18 @@ export default function NewBillPage() {
               
               <Input 
                 label={isBishiSale ? "Bishi Discount (₹)" : "Discount Amount (₹)"}
-                type="number"
-                min={0}
-                value={discountAmount || ''}
-                onChange={(e) => setDiscountAmount(Number(e.target.value))}
+                type="text"
+                value={String(discountAmount)}
+                onChange={(e) => setDiscountAmount(e.target.value)}
               />
             </div>
 
             <div>
               <Input 
                 label="Amount Paid" 
-                type="number" 
-                min={0}
-                value={amountPaid}
-                onChange={(e) => setAmountPaid(e.target.value ? Number(e.target.value) : '')}
+                type="text" 
+                value={String(amountPaid)}
+                onChange={(e) => setAmountPaid(e.target.value)}
                 required
               />
             </div>
@@ -889,10 +960,10 @@ export default function NewBillPage() {
               <span className="text-boutique-charcoalLight">Total Job Work Charges:</span>
               <span className="font-medium">₹{calcJobworkSubtotal().toFixed(2)}</span>
             </div>
-            {discountAmount > 0 && (
+            {Number(discountAmount) > 0 && (
               <div className="flex justify-between text-sm text-green-600">
                 <span>{isBishiSale ? "Bishi Discount:" : "Discount:"}</span>
-                <span>-₹{discountAmount.toFixed(2)}</span>
+                <span>-₹{Number(discountAmount).toFixed(2)}</span>
               </div>
             )}
             

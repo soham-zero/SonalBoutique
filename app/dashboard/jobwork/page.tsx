@@ -59,6 +59,7 @@ export default function JobWorkPage() {
   const [worksheetEndDate, setWorksheetEndDate] = useState('')
   const [worksheetJobs, setWorksheetJobs] = useState<JobItem[]>([])
   const [loadingWorksheet, setLoadingWorksheet] = useState(false)
+  const [hideOverdue, setHideOverdue] = useState(false)
 
   const handleLoadWorksheet = async () => {
     if (!worksheetStartDate || !worksheetEndDate) {
@@ -128,6 +129,8 @@ export default function JobWorkPage() {
   }, [worksheetJobs])
 
   const sortedJobs = React.useMemo(() => {
+    const today = startOfDay(new Date())
+
     // assign temporary relative item numbers for sorting among items with identical bill numbers
     const txCounts: Record<string, number> = {}
     const jobsWithItemNum = jobs.map(job => {
@@ -139,7 +142,11 @@ export default function JobWorkPage() {
       return { ...job, item_number: txCounts[txId] }
     })
 
-    return jobsWithItemNum.sort((a, b) => {
+    const filtered = (hideOverdue && activeTab === 'active')
+      ? jobsWithItemNum.filter(job => !job.due_date || !isBefore(startOfDay(new Date(job.due_date)), today))
+      : jobsWithItemNum
+
+    return filtered.sort((a, b) => {
       // 1. Sort by due_date ascending (nearer date above)
       if (!a.due_date && b.due_date) return 1
       if (a.due_date && !b.due_date) return -1
@@ -157,7 +164,7 @@ export default function JobWorkPage() {
       // 3. Sort by item number within same bill
       return (a.item_number || 0) - (b.item_number || 0)
     })
-  }, [jobs])
+  }, [jobs, hideOverdue, activeTab])
 
   const fetchJobs = async (isLoadMore = false, q = searchQuery, status = statusFilter) => {
     if (activeTab === 'inventory') return
@@ -323,7 +330,7 @@ export default function JobWorkPage() {
             <form onSubmit={handleSearchSubmit} className="flex-1 max-w-md relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-boutique-charcoalLight" />
               <Input 
-                placeholder="Search job name..."
+                placeholder="Search by job, customer or bill no..."
                 className="pl-9"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
@@ -350,11 +357,20 @@ export default function JobWorkPage() {
                     {s}
                   </Button>
                 ))}
+                <div className="w-px h-5 bg-boutique-border mx-1" />
+                <Button
+                  size="sm"
+                  variant={hideOverdue ? 'outline' : 'primary'}
+                  onClick={() => setHideOverdue(prev => !prev)}
+                  className={hideOverdue ? 'text-red-600 border-red-300 hover:bg-red-50' : ''}
+                >
+                  {hideOverdue ? 'Show Overdue' : 'Hide Overdue'}
+                </Button>
               </div>
             )}
 
             <span className="text-sm text-boutique-charcoalLight md:ml-auto font-medium self-center">
-              {jobs.length} of {totalCount} Jobs
+              {sortedJobs.length} Jobs{hideOverdue && activeTab === 'active' && jobs.length > sortedJobs.length ? <span className="text-red-500 ml-1">({jobs.length - sortedJobs.length} overdue hidden)</span> : null}
             </span>
           </div>
 
@@ -400,10 +416,52 @@ export default function JobWorkPage() {
                 </Button>
               </div>
             </div>
+
+            {/* Worksheet On-Screen Preview Table */}
             {worksheetJobs.length > 0 && (
-              <p className="text-xs text-boutique-emerald font-semibold mt-3">
-                ✓ Loaded {worksheetJobs.length} active jobs for the worksheet. Click "Print Worksheet" to print them.
-              </p>
+              <div className="mt-5">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-boutique-charcoal">
+                    Worksheet Preview: {worksheetStartDate && format(new Date(worksheetStartDate), 'dd MMM yyyy')} → {worksheetEndDate && format(new Date(worksheetEndDate), 'dd MMM yyyy')}
+                    <span className="ml-2 text-xs font-normal text-boutique-charcoalLight">({worksheetJobs.length} jobs)</span>
+                  </p>
+                  <Button size="sm" variant="ghost" onClick={() => setWorksheetJobs([])} className="text-boutique-charcoalLight hover:text-red-600 text-xs">
+                    × Clear
+                  </Button>
+                </div>
+                <div className="overflow-x-auto rounded-xl border border-boutique-border">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-boutique-creamDark/60 font-semibold uppercase tracking-wider text-boutique-charcoalLight border-b border-boutique-border">
+                      <tr>
+                        <th className="px-4 py-2.5">Bill #</th>
+                        <th className="px-4 py-2.5">Job Name</th>
+                        <th className="px-4 py-2.5">Customer</th>
+                        <th className="px-4 py-2.5">Status</th>
+                        <th className="px-4 py-2.5">Due Date</th>
+                        <th className="px-4 py-2.5">Cloth By</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-boutique-border/60">
+                      {sortedWorksheetJobs.map((job) => (
+                        <tr key={job.id} className="hover:bg-boutique-cream/20">
+                          <td className="px-4 py-2.5 font-mono">
+                            {job.transactions?.bill_number ? (
+                              <Link href={`/dashboard/billing/${job.transactions.id}`} className="hover:underline text-boutique-indigo">
+                                #{job.transactions.bill_number}
+                              </Link>
+                            ) : 'N/A'}
+                          </td>
+                          <td className="px-4 py-2.5 font-semibold text-boutique-charcoal">{job.name}</td>
+                          <td className="px-4 py-2.5 text-boutique-charcoal">{job.transactions?.customers?.name || 'Walk-in'}</td>
+                          <td className="px-4 py-2.5 capitalize">{job.status}</td>
+                          <td className="px-4 py-2.5">{job.due_date ? format(new Date(job.due_date), 'dd MMM yy') : '—'}</td>
+                          <td className="px-4 py-2.5 capitalize text-boutique-charcoalLight">{job.cloth_provided_by}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
           </div>
 
@@ -611,85 +669,117 @@ export default function JobWorkPage() {
       {/* ── Print Styles ─────────────────────────────────────────────── */}
       <style>{`
         @media print {
-          @page { margin: 1.5cm; }
-          body { background: white !important; color: black !important; }
+          @page { size: A4; margin: 1.2cm; }
+
+          /* Critical: reset all flex layouts, heights, and positions to allow clean pagination without header overlap */
+          html, body, main, .flex {
+            display: block !important;
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+            position: static !important;
+          }
+          div, section, article {
+            height: auto !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+
+          body { background: white !important; color: black !important; font-size: 9pt !important; }
           .no-print, aside, header, nav, footer, button, .print-hidden { display: none !important; }
           .print-area { display: block !important; width: 100% !important; }
+          .print-table { width: 100%; border-collapse: collapse; }
+          .print-table thead { display: table-header-group; }
+          .print-table th {
+            background: #f5ece8 !important;
+            padding: 5px 8px;
+            font-size: 7.5pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            border-bottom: 1.5px solid #d9bfb4;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .print-table td {
+            padding: 5px 8px;
+            font-size: 8.5pt;
+            border-bottom: 0.5px solid #e8ddd9;
+            vertical-align: top;
+          }
+          .print-table tr { page-break-inside: avoid; }
+          .print-date-header td {
+            background: #fdf6f3 !important;
+            font-weight: 700;
+            font-size: 8pt;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            border-top: 1px solid #d9bfb4;
+            border-bottom: 1px solid #d9bfb4;
+            padding: 4px 8px;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
         }
       `}</style>
 
       {/* Printable Worksheet (Hidden on screen, visible on print) */}
       <div className="hidden print:block print-area">
-        <div className="mb-6">
-          <h1 className="font-serif text-2xl font-bold text-boutique-charcoal">Sonal Boutique</h1>
-          <p className="text-sm font-semibold uppercase tracking-wider text-boutique-charcoalLight mt-1">
+        <div style={{ marginBottom: '12px' }}>
+          <h1 style={{ fontFamily: 'serif', fontSize: '16pt', fontWeight: 700 }}>Sonal Boutique</h1>
+          <p style={{ fontSize: '9pt', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6b5a54', marginTop: '2px' }}>
             Tailor Worksheet
           </p>
           {worksheetStartDate && worksheetEndDate && (
-            <p className="text-xs text-boutique-charcoalLight">
+            <p style={{ fontSize: '8pt', color: '#6b5a54', marginTop: '2px' }}>
               Due Date Range: {format(new Date(worksheetStartDate), 'dd MMM yyyy')} to {format(new Date(worksheetEndDate), 'dd MMM yyyy')}
+              {' · '}{sortedWorksheetJobs.length} jobs
             </p>
           )}
         </div>
 
-        <div className="border border-boutique-border rounded-xl overflow-hidden bg-white text-sm">
-          <table className="w-full text-left text-xs">
-            <thead className="bg-boutique-creamDark/60 font-semibold uppercase tracking-wider text-boutique-charcoalLight border-b border-boutique-border">
-              <tr>
-                <th className="px-4 py-2.5">Bill #</th>
-                <th className="px-4 py-2.5">Job Name</th>
-                <th className="px-4 py-2.5">Customer</th>
-                <th className="px-4 py-2.5">Status</th>
-                <th className="px-4 py-2.5">Due Date</th>
-                <th className="px-4 py-2.5">Cloth By</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-boutique-border">
-              {(() => {
-                let lastDueDate: string | null | undefined = undefined
-                return sortedWorksheetJobs.map((job) => {
-                  const showHeader = job.due_date !== lastDueDate
-                  if (showHeader) {
-                    lastDueDate = job.due_date
-                  }
-
-                  return (
-                    <React.Fragment key={job.id}>
-                      {showHeader && (
-                        <tr className="bg-boutique-creamDark/40 border-y border-boutique-border">
-                          <td colSpan={6} className="px-4 py-2 font-semibold text-boutique-charcoal text-xs uppercase tracking-wider">
-                            Due Date: {job.due_date ? format(new Date(job.due_date), 'dd MMM yyyy') : 'No Due Date'}
-                          </td>
-                        </tr>
-                      )}
-                      <tr>
-                        <td className="px-4 py-3 font-mono">
-                          {job.transactions?.bill_number ? `#${job.transactions.bill_number}` : 'N/A'}
+        <table className="print-table">
+          <thead>
+            <tr>
+              <th style={{ width: '10%' }}>Bill #</th>
+              <th style={{ width: '38%' }}>Job Name</th>
+              <th style={{ width: '30%' }}>Customer</th>
+              <th style={{ width: '12%' }}>Status</th>
+              <th style={{ width: '10%' }}>Due Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(() => {
+              let lastDueDate: string | null | undefined = undefined
+              return sortedWorksheetJobs.map((job) => {
+                const showHeader = job.due_date !== lastDueDate
+                if (showHeader) {
+                  lastDueDate = job.due_date
+                }
+                return (
+                  <React.Fragment key={job.id}>
+                    {showHeader && (
+                      <tr className="print-date-header">
+                        <td colSpan={5}>
+                          Due Date: {job.due_date ? format(new Date(job.due_date), 'dd MMM yyyy') : 'No Due Date'}
                         </td>
-                        <td className="px-4 py-3 font-semibold text-boutique-charcoal">
-                          {job.name}
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="font-semibold text-boutique-charcoal">
-                            {job.transactions?.customers?.name || 'Walk-in'}
-                          </div>
-                          {job.transactions?.customers?.phone && (
-                            <div className="text-[10px] text-boutique-charcoalLight">{job.transactions.customers.phone}</div>
-                          )}
-                        </td>
-                        <td className="px-4 py-3 capitalize">{job.status}</td>
-                        <td className="px-4 py-3">
-                          {job.due_date ? format(new Date(job.due_date), 'dd MMM yy') : '—'}
-                        </td>
-                        <td className="px-4 py-3 capitalize text-boutique-charcoalLight">{job.cloth_provided_by}</td>
                       </tr>
-                    </React.Fragment>
-                  )
-                })
-              })()}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                    <tr>
+                      <td style={{ fontFamily: 'monospace' }}>
+                        {job.transactions?.bill_number ? `#${job.transactions.bill_number}` : 'N/A'}
+                      </td>
+                      <td style={{ fontWeight: 600 }}>{job.name}</td>
+                      <td>{job.transactions?.customers?.name || 'Walk-in'}</td>
+                      <td style={{ textTransform: 'capitalize' }}>{job.status}</td>
+                      <td>{job.due_date ? format(new Date(job.due_date), 'dd MMM yy') : '—'}</td>
+                    </tr>
+                  </React.Fragment>
+                )
+              })
+            })()}
+          </tbody>
+        </table>
       </div>
     </>
   )

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createClient, createAdminClient } from '@/utils/supabase/server'
+import { recalculateCustomer } from '@/utils/billing'
 
 export async function GET(request: Request, { params }: { params: { id: string } }) {
   const { searchParams } = new URL(request.url)
@@ -46,8 +47,9 @@ export async function GET(request: Request, { params }: { params: { id: string }
 
 export async function PATCH(request: Request, { params }: { params: { id: string } }) {
   try {
-    const { password, name, phone } = await request.json()
+    const { password, name, phone, opening_balance } = await request.json()
     const supabase = createClient()
+    const adminClient = createAdminClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -67,6 +69,13 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       }
       updatePayload.phone = trimmedPhone
     }
+    if (opening_balance !== undefined) {
+      const parsed = Number(opening_balance)
+      if (isNaN(parsed)) {
+        return NextResponse.json({ error: 'Opening balance must be a valid number.' }, { status: 400 })
+      }
+      updatePayload.opening_balance = parsed
+    }
 
     if (Object.keys(updatePayload).length === 0) {
       return NextResponse.json({ error: 'No fields to update' }, { status: 400 })
@@ -74,6 +83,11 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 
     const { error } = await (supabase.from('customers') as any).update(updatePayload).eq('id', params.id)
     if (error) throw new Error(error.message)
+
+    // If opening_balance changed, recalculate this customer's totals
+    if (opening_balance !== undefined) {
+      await recalculateCustomer(params.id, adminClient)
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

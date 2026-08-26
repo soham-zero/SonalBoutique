@@ -93,6 +93,7 @@ export async function POST(request: Request) {
       amount_paid,
       customer_name,
       customer_phone,
+      customer_opening_balance,
       bishi_id,
       bishi_member_id,
       bill_date_time,
@@ -103,6 +104,32 @@ export async function POST(request: Request) {
 
     if (!bill_items.length && !job_items.length) {
       return NextResponse.json({ error: 'Must provide at least one bill item or job item.' }, { status: 400 })
+    }
+
+    // Server-side validation for numeric payload inputs
+    if (amount_paid !== undefined && (isNaN(Number(amount_paid)) || Number(amount_paid) < 0)) {
+      return NextResponse.json({ error: 'amount_paid must be a valid non-negative number.' }, { status: 400 })
+    }
+    if (payload.discount_amount !== undefined && (isNaN(Number(payload.discount_amount)) || Number(payload.discount_amount) < 0)) {
+      return NextResponse.json({ error: 'discount_amount must be a valid non-negative number.' }, { status: 400 })
+    }
+
+    for (const item of bill_items) {
+      if (!Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) {
+        return NextResponse.json({ error: 'Bill item quantity must be a positive integer.' }, { status: 400 })
+      }
+      if (isNaN(Number(item.price_sold_at)) || Number(item.price_sold_at) < 0) {
+        return NextResponse.json({ error: 'Bill item price must be a valid non-negative number.' }, { status: 400 })
+      }
+    }
+    
+    for (const job of job_items) {
+      if (!Number.isInteger(Number(job.quantity)) || Number(job.quantity) <= 0) {
+        return NextResponse.json({ error: 'Job item quantity must be a positive integer.' }, { status: 400 })
+      }
+      if (isNaN(Number(job.charge)) || Number(job.charge) < 0) {
+        return NextResponse.json({ error: 'Job item charge must be a valid non-negative number.' }, { status: 400 })
+      }
     }
 
     if (!customer_name || !customer_name.trim()) {
@@ -194,12 +221,14 @@ export async function POST(request: Request) {
 
         if (custUpdErr) throw new Error('Customer update err: ' + custUpdErr.message)
       } else {
+        const openingBal = Number(customer_opening_balance || 0)
         const { data: newCust, error: custErr } = await (adminClient.from('customers') as any).insert({
           name: customer_name,
           phone: customer_phone,
+          opening_balance: openingBal,
           total_billed: finalTotal,
           total_paid: Number(amount_paid),
-          balance: due
+          balance: openingBal + due
         }).select().single()
 
         if (custErr) throw new Error('Customer creation err: ' + custErr.message)
@@ -419,6 +448,46 @@ export async function POST(request: Request) {
           .update({ job_item_id: (newJob as any).id })
           .eq('job_item_id', job.original_id)
         if (ledgerMoveErr) throw new Error('Failed to carry over job ledger: ' + ledgerMoveErr.message)
+
+        // Fetch old job specs to copy them
+        const { data: oldSpecs } = await adminClient.from('job_specs')
+          .select('*')
+          .eq('job_item_id', job.original_id)
+          .maybeSingle()
+        
+        if (oldSpecs) {
+          const { error: specCopyErr } = await (adminClient.from('job_specs') as any).insert({
+            job_item_id: (newJob as any).id,
+            measurements: (oldSpecs as any).measurements || {},
+            image_urls: (oldSpecs as any).image_urls || [],
+            note: (oldSpecs as any).note || null
+          })
+          if (specCopyErr) throw new Error('Failed to copy job specs: ' + specCopyErr.message)
+
+          // Delete the old spec row since we have successfully carried it over
+          const { error: specDeleteErr } = await (adminClient.from('job_specs') as any)
+            .delete()
+            .eq('job_item_id', job.original_id)
+          if (specDeleteErr) throw new Error('Failed to delete old job specs: ' + specDeleteErr.message)
+        } else {
+          // If no old spec existed, create a new empty one
+          await (adminClient.from('job_specs') as any).insert({
+            job_item_id: (newJob as any).id,
+            measurements: {},
+            image_urls: [],
+            note: null
+          })
+        }
+      } else if (newJob) {
+        // Create an empty job_specs for new job items so they appear in Tailor app immediately
+        const { error: specCreateErr } = await (adminClient.from('job_specs') as any)
+          .insert({
+            job_item_id: (newJob as any).id,
+            measurements: {},
+            image_urls: [],
+            note: null
+          })
+        if (specCreateErr) throw new Error('Failed to create initial job specs: ' + specCreateErr.message)
       }
     }
 

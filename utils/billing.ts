@@ -1,6 +1,18 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 
 export async function recalculateCustomer(customerId: string, supabase: SupabaseClient) {
+  // 0. Fetch opening_balance for this customer
+  const { data: custRow, error: custErr } = await supabase
+    .from('customers')
+    .select('opening_balance')
+    .eq('id', customerId)
+    .single()
+
+  if (custErr) {
+    throw new Error('Failed to fetch customer opening balance: ' + custErr.message)
+  }
+  const openingBalance = Number((custRow as any)?.opening_balance || 0)
+
   // 1. Fetch all ACTIVE transactions for this customer
   const { data: activeTransactions, error: txErr } = await supabase
     .from('transactions')
@@ -28,7 +40,8 @@ export async function recalculateCustomer(customerId: string, supabase: Supabase
   const standalonePaid = (payments || []).reduce((sum, pay) => sum + Number(pay.amount_paid || 0), 0)
 
   const totalPaid = transactionPaid + standalonePaid
-  const balance = totalBilled - totalPaid
+  // opening_balance is a prior debt (positive) or advance (negative) before any transactions
+  const balance = openingBalance + totalBilled - totalPaid
 
   // 4. Update the customer record
   const { error: updateErr } = await (supabase.from('customers') as any)
@@ -43,5 +56,5 @@ export async function recalculateCustomer(customerId: string, supabase: Supabase
     throw new Error('Failed to update customer aggregates: ' + updateErr.message)
   }
 
-  return { totalBilled, totalPaid, balance }
+  return { openingBalance, totalBilled, totalPaid, balance }
 }
