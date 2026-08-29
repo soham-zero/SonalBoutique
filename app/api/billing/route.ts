@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/utils/supabase/server'
 import { recalculateCustomer } from '@/utils/billing'
+import { recalculateBishiMember } from '@/utils/bishi'
 import { cleanupJobSpec } from '@/utils/jobSpecs'
 
 export async function GET(request: Request) {
@@ -244,14 +245,8 @@ export async function POST(request: Request) {
       const { data: oldSales } = await adminClient.from('bishi_sales').select('*').eq('transaction_id', original_transaction_id).single()
       if (oldSales) {
         const sale = oldSales as any
-        const { data: member } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', sale.bishi_member_id).single()
-        if (member) {
-          await (adminClient.from('bishi_members') as any).update({
-            total_redeemed: Number((member as any).total_redeemed) - Number(sale.redeemed),
-            balance: Number((member as any).balance) + Number(sale.redeemed)
-          }).eq('id', sale.bishi_member_id)
-        }
         await (adminClient.from('bishi_sales') as any).delete().eq('transaction_id', original_transaction_id)
+        await recalculateBishiMember(sale.bishi_member_id, adminClient)
       }
 
       // Revert original Bishi bill items
@@ -502,24 +497,8 @@ export async function POST(request: Request) {
       })
       if (bishiSaleErr) throw new Error('Failed to create bishi sale: ' + bishiSaleErr.message)
 
-      // Update Member
-      const { data: member, error: memberFetchErr } = await adminClient.from('bishi_members').select('total_redeemed, balance').eq('id', bishi_member_id).single()
-      if (memberFetchErr) throw new Error('Failed to fetch bishi member: ' + memberFetchErr.message)
-      const memberData = member as any
-      if (memberData) {
-        bishiMemberUpdatedData = {
-          id: bishi_member_id,
-          total_redeemed: Number(memberData.total_redeemed),
-          balance: Number(memberData.balance)
-        }
-        const updatedRedeemed = Number(memberData.total_redeemed) + discount_amount
-        const updatedBalance = Number(memberData.balance) - discount_amount
-        const { error: memUpdErr } = await (adminClient.from('bishi_members') as any).update({
-          total_redeemed: updatedRedeemed,
-          balance: updatedBalance
-        }).eq('id', bishi_member_id)
-        if (memUpdErr) throw new Error('Failed to update bishi member: ' + memUpdErr.message)
-      }
+      // Update Member Balance via Utility
+      await recalculateBishiMember(bishi_member_id, adminClient)
     }
 
     // Step 8: Recalculate customer billing total
@@ -546,12 +525,7 @@ export async function POST(request: Request) {
     // Rollback DB Changes in reverse order with isolated try-catch blocks
     if (bishiMemberUpdatedData) {
       try {
-        await (adminClient.from('bishi_members') as any)
-          .update({
-            total_redeemed: bishiMemberUpdatedData.total_redeemed,
-            balance: bishiMemberUpdatedData.balance
-          })
-          .eq('id', bishiMemberUpdatedData.id)
+        await recalculateBishiMember(bishiMemberUpdatedData.id, adminClient)
       } catch (e) {
         console.error("Rollback of bishi member failed:", e)
       }

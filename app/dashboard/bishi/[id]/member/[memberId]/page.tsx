@@ -26,6 +26,33 @@ export default function BishiMemberDetailPage({ params }: { params: { id: string
   const [error, setError] = useState<string | null>(null)
   const [typeFilter, setTypeFilter] = useState<'all' | 'contribution' | 'redemption'>('all')
 
+  // Opening Balance Edit State
+  const [isEditingOpeningBalance, setIsEditingOpeningBalance] = useState(false)
+  const [editOpeningBalanceValue, setEditOpeningBalanceValue] = useState('')
+  const [isSavingOpeningBalance, setIsSavingOpeningBalance] = useState(false)
+
+  const handleSaveOpeningBalance = async () => {
+    if (!editOpeningBalanceValue) return
+    setIsSavingOpeningBalance(true)
+    try {
+      const res = await fetch(`/api/bishi/${params.id}/members/${params.memberId}/opening-balance`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ opening_balance: editOpeningBalanceValue })
+      })
+      if (!res.ok) {
+        const d = await res.json()
+        throw new Error(d.error || 'Failed to update')
+      }
+      setIsEditingOpeningBalance(false)
+      fetchMemberDetails()
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setIsSavingOpeningBalance(false)
+    }
+  }
+
   const fetchMemberDetails = async () => {
     try {
       const res = await fetch(`/api/bishi/${params.id}/members/${params.memberId}`)
@@ -99,22 +126,71 @@ export default function BishiMemberDetailPage({ params }: { params: { id: string
       />
 
       {/* HIGHLIGHT STATS */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 flex flex-col justify-between">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Opening Balance Card */}
+        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-5 flex flex-col justify-between group hover:border-boutique-roseDark/50 transition-colors relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 w-16 h-16 bg-boutique-roseLight/20 rounded-full blur-xl" />
+          <div className="flex items-center justify-between z-10">
+            <span className="text-xs font-semibold uppercase tracking-wider text-boutique-roseDark">Opening Balance</span>
+            <Banknote className="w-4 h-4 text-boutique-roseDark/70" />
+          </div>
+          <div className="mt-3 z-10">
+            {isEditingOpeningBalance ? (
+              <div className="flex flex-col gap-2 mt-1">
+                <input
+                  type="number"
+                  step="0.01"
+                  autoFocus
+                  className="w-full text-lg font-bold border-b-2 border-boutique-roseDark bg-transparent focus:outline-none"
+                  value={editOpeningBalanceValue}
+                  onChange={e => setEditOpeningBalanceValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') handleSaveOpeningBalance()
+                    if (e.key === 'Escape') setIsEditingOpeningBalance(false)
+                  }}
+                  disabled={isSavingOpeningBalance}
+                />
+                <div className="flex gap-2">
+                  <button onClick={handleSaveOpeningBalance} disabled={isSavingOpeningBalance} className="text-xs font-bold text-boutique-roseDark bg-boutique-roseLight/30 px-2 py-1 rounded hover:bg-boutique-roseLight/50 transition-colors">
+                    {isSavingOpeningBalance ? 'Saving...' : 'Save'}
+                  </button>
+                  <button onClick={() => setIsEditingOpeningBalance(false)} disabled={isSavingOpeningBalance} className="text-xs font-semibold text-boutique-charcoalLight hover:text-boutique-charcoal transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between group-hover:bg-transparent">
+                <h3 className="text-2xl font-bold text-boutique-charcoal">₹{Number(member.opening_balance || 0).toLocaleString()}</h3>
+                <button
+                  onClick={() => {
+                    setEditOpeningBalanceValue(String(member.opening_balance || 0))
+                    setIsEditingOpeningBalance(true)
+                  }}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity text-xs font-bold text-boutique-roseDark bg-boutique-roseLight/30 px-2 py-1 rounded hover:bg-boutique-roseLight/60 active:scale-95"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-5 flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase font-semibold tracking-wider text-boutique-charcoalLight">Total Contributed</span>
             <h3 className="text-2xl font-bold text-boutique-emerald mt-1">₹{Number(member.total_contributed).toLocaleString()}</h3>
           </div>
           <ArrowUpCircle className="w-5 h-5 text-boutique-emerald mt-4 self-end" />
         </div>
-        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-6 flex flex-col justify-between">
+        <div className="bg-white rounded-xl shadow-soft border border-boutique-border p-5 flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase font-semibold tracking-wider text-boutique-charcoalLight">Total Redeemed</span>
             <h3 className="text-2xl font-bold text-red-500 mt-1">₹{Number(member.total_redeemed).toLocaleString()}</h3>
           </div>
           <ArrowDownCircle className="w-5 h-5 text-red-500 mt-4 self-end" />
         </div>
-        <div className="bg-boutique-creamDark rounded-xl shadow-soft border border-boutique-border p-6 flex flex-col justify-between">
+        <div className="bg-boutique-creamDark rounded-xl shadow-soft border border-boutique-border p-5 flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase font-semibold tracking-wider text-boutique-charcoalLight">Current Balance</span>
             <h3 className="text-2xl font-bold text-boutique-charcoal mt-1">₹{Number(member.balance).toLocaleString()}</h3>

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/server'
+import { recalculateBishiMember } from '@/utils/bishi'
 
 export async function POST(request: Request, { params }: { params: { id: string, memberId: string } }) {
   try {
@@ -12,23 +13,7 @@ export async function POST(request: Request, { params }: { params: { id: string,
 
     const admin = createAdminClient()
 
-    // 1. Fetch member
-    const { data: member, error: mbErr } = await admin.from('bishi_members').select('*').eq('id', memberId).single()
-    if (mbErr || !member) throw new Error("Member not found")
-    const memberData = member as any
-
-    // 2. Update member balances first — ledger is only written if this succeeds
-    const newTotalContributed = Number(memberData.total_contributed) + Number(amount)
-    const newBalance = Number(memberData.balance) + Number(amount)
-
-    const { error: updateErr } = await (admin.from('bishi_members') as any).update({
-       total_contributed: newTotalContributed,
-       balance: newBalance
-    }).eq('id', memberId)
-
-    if (updateErr) throw new Error("Failed to update member balances: " + updateErr.message)
-
-    // 3. Insert ledger only after member update is confirmed
+    // 1. Insert ledger entry first
     const ledgerPayload: any = {
       bishi_id: bishi_id,
       bishi_member_id: memberId,
@@ -43,6 +28,9 @@ export async function POST(request: Request, { params }: { params: { id: string,
 
     const { error: insertErr } = await (admin.from('bishi_ledger') as any).insert(ledgerPayload)
     if (insertErr) throw new Error("Failed to log contribution: " + insertErr.message)
+
+    // 2. Recalculate balances centrally
+    const newBalance = await recalculateBishiMember(memberId, admin)
 
     return NextResponse.json({ success: true, balance: newBalance })
   } catch (err: any) {

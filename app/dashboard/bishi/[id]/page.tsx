@@ -18,6 +18,7 @@ type BishiMember = {
   id: string
   name: string
   phone: string | null
+  opening_balance: number
   total_contributed: number
   total_redeemed: number
   balance: number
@@ -222,6 +223,7 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
   const [isAddingMember, setIsAddingMember] = useState(false)
   const [mName, setMName]                   = useState('')
   const [mPhone, setMPhone]                 = useState('')
+  const [mOpeningBalance, setMOpeningBalance] = useState('')
   const [memberSearch, setMemberSearch]     = useState('')
   const [contributeModal, setContributeModal] = useState<BishiMember | null>(null)
 
@@ -254,9 +256,9 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
       const res = await fetch(`/api/bishi/${params.id}/members`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: mName, phone: mPhone })
+        body: JSON.stringify({ name: mName, phone: mPhone, opening_balance: mOpeningBalance ? Number(mOpeningBalance) : 0 })
       })
-      if (res.ok) { setMName(''); setMPhone(''); setIsAddingMember(false); fetchData() }
+      if (res.ok) { setMName(''); setMPhone(''); setMOpeningBalance(''); setIsAddingMember(false); fetchData() }
     } catch (e) { console.error(e) }
   }
 
@@ -382,9 +384,10 @@ export default function BishiGroupDetailPage({ params }: { params: { id: string 
           </div>
 
           {isAddingMember && (
-            <form onSubmit={handleAddMember} className="bg-white p-6 rounded-2xl border border-boutique-border shadow-soft grid grid-cols-1 md:grid-cols-3 gap-4 items-end animate-slide-down">
+            <form onSubmit={handleAddMember} className="bg-white p-6 rounded-2xl border border-boutique-border shadow-soft grid grid-cols-1 md:grid-cols-4 gap-4 items-end animate-slide-down">
               <Input label="Member Name" value={mName} onChange={e => setMName(e.target.value)} required placeholder="Full Name" />
               <Input label="Phone Number" value={mPhone} onChange={e => setMPhone(e.target.value)} placeholder="+91..." />
+              <Input label="Opening Balance" type="number" step="0.01" value={mOpeningBalance} onChange={e => setMOpeningBalance(e.target.value)} placeholder="0.00" />
               <Button type="submit" variant="success">Register Member</Button>
             </form>
           )}

@@ -25,6 +25,7 @@ export async function POST(request: Request, { params }: { params: { id: string 
     const name = String(body.name)
     const phone = body.phone ? String(body.phone) : null
     const joined_at = body.joined_at ? String(body.joined_at) : undefined
+    const opening_balance = body.opening_balance ? Number(body.opening_balance) : 0
 
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -34,7 +35,9 @@ export async function POST(request: Request, { params }: { params: { id: string 
       bishi_id: params.id,
       name,
       phone,
-      joined_at: joined_at ? new Date(joined_at).toISOString() : new Date().toISOString()
+      joined_at: joined_at ? new Date(joined_at).toISOString() : new Date().toISOString(),
+      opening_balance,
+      balance: opening_balance // initial balance is the opening balance
     }
 
     const { data, error } = await (supabase.from('bishi_members') as any).insert(payload).select().single()

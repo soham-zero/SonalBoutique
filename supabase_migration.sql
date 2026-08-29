@@ -37,3 +37,6 @@ WITH CHECK (bucket_id = 'job-specifications');
 CREATE POLICY "Allow public read access to spec images"
 ON storage.objects FOR SELECT TO public
 USING (bucket_id = 'job-specifications');
+
+-- Add opening_balance to bishi_members
+ALTER TABLE public.bishi_members ADD COLUMN IF NOT EXISTS opening_balance NUMERIC NOT NULL DEFAULT 0.00;

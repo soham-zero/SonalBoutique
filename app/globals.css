@@ -129,3 +129,48 @@ input::placeholder, textarea::placeholder {
   from { opacity: 0; transform: translateY(-8px) scaleY(0.97); }
   to   { opacity: 1; transform: translateY(0) scaleY(1); }
 }
+
+/* ─── Print Optimizations for B&W Contrast ─────────────── */
+@media print {
+  /* Force all text to be much darker */
+  body, .text-boutique-charcoal {
+    color: #000000 !important;
+  }
+  .text-boutique-charcoalLight {
+    color: #222222 !important;
+    font-weight: 500 !important;
+  }
+  .text-gray-400, .text-gray-500, .text-gray-600, .text-gray-700 {
+    color: #222222 !important;
+    font-weight: 500 !important;
+  }
+  .text-boutique-roseDark {
+    color: #7A3B39 !important;
+  }
+  .text-boutique-indigo {
+    color: #312E81 !important;
+  }
+  .text-emerald-700, .text-emerald-600 {
+    color: #064E3B !important;
+  }
+  .text-red-700, .text-red-600, .text-amber-700 {
+    color: #7F1D1D !important;
+  }
+  
+  /* Ensure borders are dark enough to show in B&W */
+  .border-boutique-border {
+    border-color: #666666 !important;
+  }
+  .border-boutique-roseLight, .border-t-2.border-boutique-roseLight {
+    border-color: #666666 !important;
+  }
+  .divide-boutique-border\/60 > :not([hidden]) ~ :not([hidden]),
+  .divide-boutique-border > :not([hidden]) ~ :not([hidden]) {
+    border-color: #999999 !important;
+  }
+
+  /* Make table headers bolder */
+  th {
+    color: #000000 !important;
+  }
+}
