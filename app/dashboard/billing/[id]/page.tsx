@@ -67,7 +67,165 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
     } catch (e: any) { alert(e.message); setActionLoading(false) }
   }
 
-  const handlePrint = () => window.print()
+  const handlePrint = () => {
+    const element = document.getElementById('printable-invoice')
+    if (!element) return
+
+    // Clone so we can mutate without affecting the live page
+    const clone = element.cloneNode(true) as HTMLElement
+    // Remove "Cloth By" column from the cloned table (th + td both carry cloth-by-col class)
+    clone.querySelectorAll('.cloth-by-col').forEach(el => el.remove())
+
+    // Pull every <link> and <style> from the current document head so all
+    // Tailwind utilities and CSS variables are available inside the iframe.
+    const headContent = Array.from(document.head.children)
+      .filter(el => el.tagName === 'LINK' || el.tagName === 'STYLE')
+      .map(el => el.outerHTML)
+      .join('\n')
+
+    // Create a hidden iframe — the browser will print only its content,
+    // so the sidebar and every other page element is completely excluded.
+    const iframe = document.createElement('iframe')
+    iframe.setAttribute('aria-hidden', 'true')
+    Object.assign(iframe.style, {
+      position: 'fixed',
+      top: '-9999px',
+      left: '-9999px',
+      width: '148mm',   // A5 width  — gives the layout engine the right viewport
+      height: '210mm',  // A5 height
+      border: 'none',
+    })
+    document.body.appendChild(iframe)
+
+    const doc = iframe.contentDocument!
+    doc.open()
+    doc.write(`<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    ${headContent}
+    <style>
+      /* ── Page setup ─────────────────────────────────────────────── */
+      @page {
+        size: A5 portrait;
+        margin: 0.35cm 0.5cm;
+      }
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
+      html, body { margin: 0; padding: 0; background: white; font-size: 11px; }
+
+      /* ── Invoice card fills paper, no decorative shadow ─────────── */
+      #printable-invoice {
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        width: 100% !important;
+        max-width: none !important;
+        opacity: 1 !important;
+      }
+      .rounded-2xl, .rounded-xl, .rounded-lg { border-radius: 4px !important; }
+
+      /* ── Inner card padding ── */
+      .p-8, .md\\:p-10 { padding: 0.4rem 0.5rem !important; }
+
+      /* ── Header: Title & Invoice # ── */
+      .mb-10 { margin-bottom: 0.35rem !important; }
+      .mb-8  { margin-bottom: 0.35rem !important; }
+      h1.font-serif { font-size: 1.15rem !important; line-height: 1.1 !important; }
+      .text-3xl { font-size: 1.15rem !important; line-height: 1.1 !important; }
+      .text-xs { font-size: 0.65rem !important; line-height: 1.2 !important; }
+      .text-\\[10px\\] { font-size: 0.6rem !important; }
+      .text-\\[11px\\] { font-size: 0.6rem !important; }
+
+      /* ── Dividers ── */
+      .border-t-2 { border-top-width: 1px !important; }
+
+      /* ── Customer Info / Bill To Grid ── */
+      .grid.grid-cols-2.gap-8 { gap: 0.5rem !important; }
+      .text-base { font-size: 0.75rem !important; }
+      .text-sm { font-size: 0.68rem !important; }
+      .w-8.h-8 { width: 1.2rem !important; height: 1.2rem !important; }
+      .w-8.h-8 svg { width: 0.75rem !important; height: 0.75rem !important; }
+      .gap-2\\.5 { gap: 0.25rem !important; }
+      .space-y-3 > * + * { margin-top: 0.15rem !important; }
+
+      /* ── Tables & Sections ── */
+      .mb-3 { margin-bottom: 0.15rem !important; }
+      h3.font-serif { font-size: 0.75rem !important; }
+      #printable-invoice th {
+        padding: 0.2rem 0.4rem !important;
+        font-size: 0.62rem !important;
+      }
+      #printable-invoice td {
+        padding: 0.2rem 0.4rem !important;
+        font-size: 0.65rem !important;
+      }
+      #printable-invoice td span {
+        line-height: 1.15 !important;
+      }
+
+      /* ── Bottom Summary & Totals panel ── */
+      .pt-6 { padding-top: 0.35rem !important; }
+      .w-full.md\\:w-72 { width: 13rem !important; }
+      #printable-invoice .px-4 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
+      #printable-invoice .py-2\\.5 { padding-top: 0.15rem !important; padding-bottom: 0.15rem !important; }
+      #printable-invoice .space-y-1\\.5 > * + * { margin-top: 0.1rem !important; }
+
+      /* Grand total bar */
+      #printable-invoice .bg-boutique-charcoal {
+        padding: 0.25rem 0.5rem !important;
+      }
+      #printable-invoice .bg-boutique-charcoal .text-sm { font-size: 0.65rem !important; }
+      #printable-invoice .bg-boutique-charcoal .text-xl { font-size: 0.85rem !important; }
+
+      /* Balance Due bar */
+      #printable-invoice .bg-red-600 {
+        padding: 0.2rem 0.5rem !important;
+      }
+      #printable-invoice .bg-red-600 .text-sm { font-size: 0.65rem !important; }
+      #printable-invoice .bg-red-600 .text-lg { font-size: 0.8rem !important; }
+
+      /* Fully settled bar */
+      #printable-invoice .bg-emerald-600 {
+        padding: 0.2rem 0.5rem !important;
+      }
+      #printable-invoice .bg-emerald-600 .text-sm { font-size: 0.65rem !important; }
+
+      /* Paid stamp */
+      #printable-invoice .border-2.border-emerald-600 {
+        padding: 0.2rem 0.5rem !important;
+        font-size: 0.75rem !important;
+      }
+
+      /* ── B&W contrast (mirrors globals.css) ─────────────────────── */
+      body, .text-boutique-charcoal { color: #000000 !important; }
+      .text-boutique-charcoalLight  { color: #222222 !important; font-weight: 500 !important; }
+      .text-boutique-roseDark       { color: #7A3B39 !important; }
+      .text-emerald-700, .text-emerald-600 { color: #064E3B !important; }
+      .text-red-700, .text-red-600, .text-amber-700 { color: #7F1D1D !important; }
+      .border-boutique-border       { border-color: #666666 !important; }
+      .border-boutique-roseLight    { border-color: #888888 !important; }
+      .divide-boutique-border\\/60 > :not([hidden]) ~ :not([hidden]) { border-color: #aaaaaa !important; }
+      th { color: #000000 !important; }
+
+      /* ── Gradient header / footer bands ──────────────────────────── */
+      .bg-gradient-to-r { -webkit-print-color-adjust: exact !important; }
+    </style>
+  </head>
+  <body>${clone.outerHTML}</body>
+</html>`)
+    doc.close()
+
+    iframe.contentWindow!.focus()
+    // Give the iframe a moment to fully render before triggering print
+    setTimeout(() => {
+      iframe.contentWindow!.print()
+      // Clean up the iframe after the print dialog closes
+      setTimeout(() => {
+        if (document.body.contains(iframe)) document.body.removeChild(iframe)
+      }, 1500)
+    }, 650)
+  }
 
   const handleDownloadPDF = async () => {
     const element = document.getElementById('printable-invoice')
@@ -125,15 +283,6 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
 
   return (
     <div className="max-w-4xl mx-auto pb-24 space-y-6">
-      {/* ── Print Styles ─────────────────────────────────────────────── */}
-      <style>{`
-        @media print {
-          @page { margin: 0; }
-          body { background: white !important; padding: 1.4cm !important; }
-          .no-print { display: none !important; }
-          .print-area { border: none !important; box-shadow: none !important; padding: 0 !important; margin: 0 !important; width: 100% !important; }
-        }
-      `}</style>
 
       {/* ── Top Action Bar (no-print) ─────────────────────────────────── */}
       <div className="no-print flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -281,7 +430,7 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-boutique-charcoalLight mb-1">Invoice</p>
               <p className="text-3xl font-bold text-boutique-charcoal font-serif">#{data.bill_number}</p>
               <p className="text-xs text-boutique-charcoalLight mt-1">
-                {format(new Date(data.date_time), 'dd MMM yyyy')}
+                {format(new Date(data.date_time), 'dd/MM/yy')}
               </p>
               <p className="text-[11px] text-boutique-charcoalLight">
                 {format(new Date(data.date_time), 'h:mm a')}
@@ -390,7 +539,7 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
                   <thead>
                     <tr className="bg-boutique-creamDark/60">
                       <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Job</th>
-                      <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Cloth By</th>
+                      <th className="cloth-by-col px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Cloth By</th>
                       <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Due</th>
                       <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Qty</th>
                       <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider text-boutique-charcoalLight">Rate</th>
@@ -408,12 +557,12 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
                             <span className="font-medium text-boutique-charcoal">{j.name}</span>
                             {j.description && <span className="block text-[11px] text-boutique-charcoalLight mt-0.5">{j.description}</span>}
                           </td>
-                          <td className="px-4 py-3 capitalize text-boutique-charcoalLight">{j.cloth_provided_by}</td>
+                          <td className="cloth-by-col px-4 py-3 capitalize text-boutique-charcoalLight">{j.cloth_provided_by}</td>
                           <td className="px-4 py-3">
                             {j.due_date ? (
                               <span className="inline-flex items-center gap-1 text-boutique-charcoalLight text-xs">
                                 <Clock className="w-3 h-3" />
-                                {format(new Date(j.due_date), 'dd MMM yy')}
+                                {format(new Date(j.due_date), 'dd/MM/yy')}
                               </span>
                             ) : <span className="text-boutique-charcoalLight text-xs">—</span>}
                           </td>
