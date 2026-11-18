@@ -112,7 +112,7 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
         margin: 0.35cm 0.5cm;
       }
       * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; box-sizing: border-box; }
-      html, body { margin: 0; padding: 0; background: white; font-size: 11px; }
+      html, body { margin: 0; padding: 0; background: white; font-size: 13px; }
 
       /* ── Invoice card fills paper, no decorative shadow ─────────── */
       #printable-invoice {
@@ -126,75 +126,76 @@ export default function BillDetailPage({ params }: { params: { id: string } }) {
       .rounded-2xl, .rounded-xl, .rounded-lg { border-radius: 4px !important; }
 
       /* ── Inner card padding ── */
-      .p-8, .md\\:p-10 { padding: 0.4rem 0.5rem !important; }
+      .p-8, .md\\:p-10 { padding: 0.45rem 0.55rem !important; }
 
       /* ── Header: Title & Invoice # ── */
-      .mb-10 { margin-bottom: 0.35rem !important; }
-      .mb-8  { margin-bottom: 0.35rem !important; }
-      h1.font-serif { font-size: 1.15rem !important; line-height: 1.1 !important; }
-      .text-3xl { font-size: 1.15rem !important; line-height: 1.1 !important; }
-      .text-xs { font-size: 0.65rem !important; line-height: 1.2 !important; }
-      .text-\\[10px\\] { font-size: 0.6rem !important; }
-      .text-\\[11px\\] { font-size: 0.6rem !important; }
+      .mb-10 { margin-bottom: 0.45rem !important; }
+      .mb-8  { margin-bottom: 0.4rem !important; }
+      h1.font-serif { font-size: 1.55rem !important; line-height: 1.15 !important; font-weight: 800 !important; }
+      .text-3xl { font-size: 1.55rem !important; line-height: 1.15 !important; font-weight: 800 !important; }
+      .text-xs { font-size: 0.75rem !important; line-height: 1.25 !important; }
+      .text-\\[10px\\] { font-size: 0.7rem !important; font-weight: 700 !important; }
+      .text-\\[11px\\] { font-size: 0.72rem !important; }
 
       /* ── Dividers ── */
-      .border-t-2 { border-top-width: 1px !important; }
+      .border-t-2 { border-top-width: 1.5px !important; }
 
       /* ── Customer Info / Bill To Grid ── */
-      .grid.grid-cols-2.gap-8 { gap: 0.5rem !important; }
-      .text-base { font-size: 0.75rem !important; }
-      .text-sm { font-size: 0.68rem !important; }
-      .w-8.h-8 { width: 1.2rem !important; height: 1.2rem !important; }
-      .w-8.h-8 svg { width: 0.75rem !important; height: 0.75rem !important; }
-      .gap-2\\.5 { gap: 0.25rem !important; }
-      .space-y-3 > * + * { margin-top: 0.15rem !important; }
+      .grid.grid-cols-2.gap-8 { gap: 0.6rem !important; }
+      .text-base { font-size: 0.9rem !important; font-weight: 700 !important; }
+      .text-sm { font-size: 0.8rem !important; }
+      .w-8.h-8 { width: 1.4rem !important; height: 1.4rem !important; }
+      .w-8.h-8 svg { width: 0.85rem !important; height: 0.85rem !important; }
+      .gap-2\\.5 { gap: 0.35rem !important; }
+      .space-y-3 > * + * { margin-top: 0.2rem !important; }
 
       /* ── Tables & Sections ── */
-      .mb-3 { margin-bottom: 0.15rem !important; }
-      h3.font-serif { font-size: 0.75rem !important; }
+      .mb-3 { margin-bottom: 0.25rem !important; }
+      h3.font-serif { font-size: 0.95rem !important; font-weight: 700 !important; }
       #printable-invoice th {
-        padding: 0.2rem 0.4rem !important;
-        font-size: 0.62rem !important;
+        padding: 0.25rem 0.45rem !important;
+        font-size: 0.72rem !important;
+        font-weight: 700 !important;
       }
       #printable-invoice td {
-        padding: 0.2rem 0.4rem !important;
-        font-size: 0.65rem !important;
+        padding: 0.25rem 0.45rem !important;
+        font-size: 0.78rem !important;
       }
       #printable-invoice td span {
-        line-height: 1.15 !important;
+        line-height: 1.2 !important;
       }
 
       /* ── Bottom Summary & Totals panel ── */
-      .pt-6 { padding-top: 0.35rem !important; }
-      .w-full.md\\:w-72 { width: 13rem !important; }
-      #printable-invoice .px-4 { padding-left: 0.5rem !important; padding-right: 0.5rem !important; }
-      #printable-invoice .py-2\\.5 { padding-top: 0.15rem !important; padding-bottom: 0.15rem !important; }
-      #printable-invoice .space-y-1\\.5 > * + * { margin-top: 0.1rem !important; }
+      .pt-6 { padding-top: 0.4rem !important; }
+      .w-full.md\\:w-72 { width: 14rem !important; }
+      #printable-invoice .px-4 { padding-left: 0.6rem !important; padding-right: 0.6rem !important; }
+      #printable-invoice .py-2\\.5 { padding-top: 0.2rem !important; padding-bottom: 0.2rem !important; }
+      #printable-invoice .space-y-1\\.5 > * + * { margin-top: 0.15rem !important; }
 
       /* Grand total bar */
       #printable-invoice .bg-boutique-charcoal {
-        padding: 0.25rem 0.5rem !important;
+        padding: 0.3rem 0.6rem !important;
       }
-      #printable-invoice .bg-boutique-charcoal .text-sm { font-size: 0.65rem !important; }
-      #printable-invoice .bg-boutique-charcoal .text-xl { font-size: 0.85rem !important; }
+      #printable-invoice .bg-boutique-charcoal .text-sm { font-size: 0.78rem !important; }
+      #printable-invoice .bg-boutique-charcoal .text-xl { font-size: 1.05rem !important; font-weight: 800 !important; }
 
       /* Balance Due bar */
       #printable-invoice .bg-red-600 {
-        padding: 0.2rem 0.5rem !important;
+        padding: 0.25rem 0.6rem !important;
       }
-      #printable-invoice .bg-red-600 .text-sm { font-size: 0.65rem !important; }
-      #printable-invoice .bg-red-600 .text-lg { font-size: 0.8rem !important; }
+      #printable-invoice .bg-red-600 .text-sm { font-size: 0.78rem !important; }
+      #printable-invoice .bg-red-600 .text-lg { font-size: 1rem !important; font-weight: 800 !important; }
 
       /* Fully settled bar */
       #printable-invoice .bg-emerald-600 {
-        padding: 0.2rem 0.5rem !important;
+        padding: 0.25rem 0.6rem !important;
       }
-      #printable-invoice .bg-emerald-600 .text-sm { font-size: 0.65rem !important; }
+      #printable-invoice .bg-emerald-600 .text-sm { font-size: 0.78rem !important; }
 
       /* Paid stamp */
       #printable-invoice .border-2.border-emerald-600 {
-        padding: 0.2rem 0.5rem !important;
-        font-size: 0.75rem !important;
+        padding: 0.25rem 0.6rem !important;
+        font-size: 0.85rem !important;
       }
 
       /* ── B&W contrast (mirrors globals.css) ─────────────────────── */
